@@ -1,0 +1,109 @@
+# A small shop to try dockerpen with: a web front, an API that logs in colour, a
+# worker that keeps a CPU busy, a database, a cache, a search service whose health
+# check fails, and a mailer that crashes after a while.
+#
+#   docker compose -f demo/compose.yaml -p shop up -d
+#   docker compose -f demo/compose.yaml -p shop down -v
+name: shop
+
+services:
+  web:
+    image: nginx:alpine
+    ports: ["8088:80"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    depends_on: [api]
+
+  api:
+    image: busybox
+    environment:
+      PORT: "3000"
+      DATABASE_URL: postgres://shop:hunter2@db:5432/shop
+      REDIS_URL: redis://cache:6379
+      STRIPE_SECRET_KEY: sk_test_demo-not-a-real-key
+      LOG_LEVEL: info
+    command:
+      - sh
+      - -c
+      - |
+        paths="/api/orders /api/cart /api/products /api/users/me /api/checkout /healthz"
+        n=0
+        while true; do
+          n=$$((n+1))
+          for p in $$paths; do
+            ms=$$(( (n * 7 + $${#p} * 13) % 180 + 3 ))
+            printf '\033[2m%s\033[0m \033[32mINFO\033[0m  GET %s \033[36m200\033[0m %sms\n' "$$(date -u +%H:%M:%S)" "$$p" "$$ms"
+            sleep 0.4
+          done
+          if [ $$((n % 4)) -eq 0 ]; then
+            printf '\033[33mWARN\033[0m  slow query on orders (%sms) — consider an index\n' "$$((n * 31 % 900 + 400))"
+          fi
+          if [ $$((n % 7)) -eq 0 ]; then
+            printf '\033[31mERROR\033[0m POST /api/checkout 502 upstream payment provider timed out\n' >&2
+          fi
+          echo "{\"level\":\"info\",\"msg\":\"request batch done\",\"batch\":$$n,\"requests\":6}"
+        done
+
+  worker:
+    image: busybox
+    environment:
+      QUEUE: emails,thumbnails
+      CONCURRENCY: "4"
+    command:
+      - sh
+      - -c
+      - |
+        b=0
+        while true; do
+          b=$$((b+1)); i=0
+          while [ $$i -lt 150000 ]; do i=$$((i+1)); done
+          echo "processed batch $$b: $$((b * 17 % 40 + 5)) thumbnails"
+          sleep 2
+        done
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: hunter2
+      POSTGRES_DB: shop
+    volumes: [db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  cache:
+    image: redis:alpine
+    command: ["redis-server", "--save", "", "--loglevel", "verbose"]
+
+  search:
+    image: busybox
+    command:
+      [
+        "sh",
+        "-c",
+        "echo 'search: index warming up'; while true; do sleep 30; echo 'search: still warming up'; done",
+      ]
+    healthcheck:
+      test: ["CMD", "sh", "-c", "echo 'search: index not ready (0/3 shards)'; exit 1"]
+      interval: 8s
+      timeout: 2s
+      retries: 2
+
+  mailer:
+    image: busybox
+    restart: "no"
+    command:
+      [
+        "sh",
+        "-c",
+        "echo 'mailer: connecting to smtp.example.com:587'; sleep 25; echo 'mailer: fatal: connection refused (smtp.example.com:587)' >&2; exit 1",
+      ]
+
+volumes:
+  db-data:
