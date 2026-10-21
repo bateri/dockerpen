@@ -87,9 +87,8 @@ release of it has them yet: until one does, build bateri from its `main` branch.
 terminal dockerpen prints the containers as text.
 
 ```sh
-npm install
-npm run build
-node dist/server/main.js            # or `npm link`, then `dockerpen`
+npm install -g dockerpen
+dockerpen                           # or, without installing it: npx dockerpen
 dockerpen web                       # open with a container chosen (name, service or id)
 dockerpen --section images          # or on another part
 ```
@@ -99,7 +98,8 @@ pencere: nothing listens on a port, the interface travels in the terminal's own 
 runs on your machine in a sandbox that reaches nothing but its program. The first time, its
 files cross the stream once; after that the terminal keeps them.
 
-**In an MCP client.** Give it `node /path/to/dockerpen/dist/server/main.js` as a stdio server.
+**In an MCP client.** Give it `npx -y dockerpen` as a stdio server (in Claude Code:
+`claude mcp add dockerpen -- npx -y dockerpen`).
 The model can list containers, read logs and look at the disk (`list_containers`,
 `container_logs`, `disk_usage`) and show the interface (`show_docker`); whatever changes or
 removes something is for the person, in the interface.
@@ -122,10 +122,16 @@ removes something is for the person, in the interface.
 ## Work on it
 
 ```sh
+git clone https://github.com/bateri/dockerpen && cd dockerpen
+npm install
+make check          # types, build, formatting, and the server as an MCP client starts it
 npm run harness     # http://localhost:5199 — the view in a stand-in host, with live Docker
 npx vite build --watch & npm run dev   # in a pencere terminal: the view is shown again
                                        # each time its build changes
 ```
+
+How a version is released is in [RELEASING.md](RELEASING.md), and what each one changed in
+[CHANGELOG.md](CHANGELOG.md).
 
 The harness plays the terminal in a browser: it frames the view with hot reload, sends it the
 colours of a terminal theme (bateri's, Tokyo Night, Gruvbox, Solarized and more) and the size of
