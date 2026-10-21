@@ -14,6 +14,7 @@ import {
   registerAppTool,
 } from "@modelcontextprotocol/ext-apps/server";
 import { McpServer } from "@modelcontextprotocol/server";
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { z } from "zod";
 
@@ -38,7 +39,10 @@ export const VIEW_DIRECTORY = new URL("../view/", import.meta.url);
 /** The view as one document, for every other MCP Apps host. */
 const VIEW_DOCUMENT = new URL("../single/index.html", import.meta.url);
 
-export const VERSION = "0.1.0";
+/** The package's version, from its manifest: a release changes it there and nowhere else. */
+export const VERSION: string = JSON.parse(
+  readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+).version;
 
 const SECTIONS = ["containers", "images", "volumes", "networks", "system", "activity"] as const;
 

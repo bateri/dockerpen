@@ -1,0 +1,36 @@
+# The gate and the steps of a release; RELEASING.md says in what order and why.
+.PHONY: setup check release-prepare release publish publish-local approve
+
+setup:
+	npm ci
+
+# check is the gate: types, the build, formatting, and the built server as an MCP client starts it.
+check:
+	npm run typecheck
+	npm run build
+	npx prettier --check .
+	npm test
+
+# release-prepare sets the version and dates the changelog's Unreleased section.
+release-prepare:
+	@test -n "$(VERSION)" || { echo "usage: make release-prepare VERSION=<x.y.z>"; exit 2; }
+	node tools/release.mjs prepare $(VERSION)
+
+# release runs the gate and the release checks, then tags. Nothing is pushed.
+release: check
+	node tools/release.mjs tag
+
+# publish pushes main and the tag; the release workflow stages the package and a
+# maintainer approves it on npm with 2FA. Publishing: run on the maintainer's word.
+publish:
+	node tools/release.mjs push
+
+# publish-local publishes from this machine, then pushes: the first release, before the
+# registry knows the package and its trusted publisher.
+publish-local:
+	node tools/release.mjs local
+
+# approve makes public the version the release workflow staged on npm, with 2FA.
+# Publishing: run on the maintainer's word.
+approve:
+	node tools/release.mjs approve

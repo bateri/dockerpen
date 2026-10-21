@@ -18,6 +18,7 @@
   },
   "files": [
     "dist",
+    "CHANGELOG.md",
     "README.md",
     "LICENSE"
   ],
@@ -29,7 +30,8 @@
     "start": "node dist/server/main.js",
     "dev": "node dist/server/main.js --dev",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test": "node --test test/*.test.mjs"
   },
   "engines": {
     "node": ">=22.12"
@@ -49,6 +51,7 @@
     "@vitejs/plugin-react": "^6.1.2",
     "lucide-react": "^1.61.0",
     "motion": "^14.5.0",
+    "prettier": "^3.9.10",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "typescript": "^5.9.3",
