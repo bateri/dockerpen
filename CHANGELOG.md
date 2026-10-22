@@ -7,6 +7,13 @@ change what the previous one did.
 
 ## [Unreleased]
 
+### Added
+
+- dockerpen's icon, the mark of three stacked containers its view shows, beside its name above
+  the view in a terminal that draws program icons (bateri), and beside the server in MCP clients
+  that show them. It comes for a dark ground and a light one, as PNGs inside the program, since a
+  terminal draws only the icons it is given and fetches none.
+
 ## [0.1.1] - 2026-10-22
 
 ### Fixed

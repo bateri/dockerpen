@@ -20,6 +20,7 @@ import { z } from "zod";
 
 import type { Dockerpen } from "./app.js";
 import { containerTable, diskText, summaryLine } from "./format.js";
+import { ICONS } from "./icon.js";
 import {
   imageHistory,
   listImages,
@@ -97,11 +98,12 @@ function guarded<A, R>(handler: (args: A) => Promise<R>) {
 }
 
 export function createServer(dockerpen: Dockerpen): McpServer {
-  const server = new McpServer({ name: "dockerpen", version: VERSION });
+  // A terminal draws the icon beside the program's name above the view; other clients, beside the server.
+  const server = new McpServer({ name: "dockerpen", version: VERSION, icons: ICONS });
 
   // ---- the view's tool -----------------------------------------------------------------
 
-  registerAppTool(
+  const view = registerAppTool(
     server,
     "show_docker",
     {
@@ -134,6 +136,8 @@ export function createServer(dockerpen: Dockerpen): McpServer {
       return data({ boot, poll }, summary);
     }),
   );
+  // ext-apps' config has no `icons`, though the tool it registers carries them into tools/list.
+  view.icons = ICONS;
 
   registerAppTool(
     server,
