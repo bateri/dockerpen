@@ -407,25 +407,27 @@ export function ImagesSection() {
                       onContextMenu={(event) => menu(event, image)}
                     >
                       <td>
-                        {marked.size > 0 ? (
-                          <Checkbox checked={marked.has(image.id)} />
-                        ) : (
-                          <button
-                            type="button"
-                            className="btn"
-                            data-variant="ghost"
-                            data-size="sm"
-                            data-icon="true"
-                            aria-label="Layers"
-                            onClick={() => setOpen(open === image.id ? null : image.id)}
-                          >
-                            {open === image.id ? (
-                              <ChevronDown size={13} />
-                            ) : (
-                              <ChevronRight size={13} />
-                            )}
-                          </button>
-                        )}
+                        <span className="lead">
+                          {marked.size > 0 ? (
+                            <Checkbox checked={marked.has(image.id)} />
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn"
+                              data-variant="ghost"
+                              data-size="sm"
+                              data-icon="true"
+                              aria-label="Layers"
+                              onClick={() => setOpen(open === image.id ? null : image.id)}
+                            >
+                              {open === image.id ? (
+                                <ChevronDown size={13} />
+                              ) : (
+                                <ChevronRight size={13} />
+                              )}
+                            </button>
+                          )}
+                        </span>
                       </td>
                       <td>
                         <span className="cell-stack">
@@ -785,11 +787,13 @@ export function VolumesSection() {
                     }}
                   >
                     <td>
-                      {marked.size > 0 ? (
-                        <Checkbox checked={marked.has(v.name)} />
-                      ) : (
-                        <HardDrive size={13} className="faint" />
-                      )}
+                      <span className="lead">
+                        {marked.size > 0 ? (
+                          <Checkbox checked={marked.has(v.name)} />
+                        ) : (
+                          <HardDrive size={13} className="faint" />
+                        )}
+                      </span>
                     </td>
                     <td>
                       <span className="cell-stack">
@@ -993,11 +997,13 @@ export function NetworksSection() {
                     }}
                   >
                     <td>
-                      {marked.size > 0 ? (
-                        <Checkbox checked={marked.has(n.id)} />
-                      ) : (
-                        <Network size={13} className="faint" />
-                      )}
+                      <span className="lead">
+                        {marked.size > 0 ? (
+                          <Checkbox checked={marked.has(n.id)} />
+                        ) : (
+                          <Network size={13} className="faint" />
+                        )}
+                      </span>
                     </td>
                     <td>
                       <span className="cell-stack">

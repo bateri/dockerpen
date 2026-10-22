@@ -7,6 +7,12 @@ change what the previous one did.
 
 ## [Unreleased]
 
+### Fixed
+
+- The icons, checkboxes and layers button in the first column of the image, volume and network
+  lists sit on the middle of their row, where a container's dot sits in its list, instead of on
+  the text's baseline and further left.
+
 ## [0.2.0] - 2026-10-22
 
 ### Added

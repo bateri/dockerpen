@@ -1862,6 +1862,20 @@ kbd,
   text-overflow: clip;
 }
 
+/* A table row's mark (its icon, its checkbox, the image's layers button) in the column where a
+   container row has its dot: 18px wide past the row's 8px, so the four lists put it on one line,
+   and on the middle of the row rather than on the text's baseline. */
+.lead {
+  display: grid;
+  place-items: center;
+  width: 18px;
+}
+
+/* The layers button is wider than the column: its hover reaches past it, its icon stays centred. */
+.lead > .btn {
+  margin: 0 -3px;
+}
+
 .table .num {
   text-align: right;
 }
