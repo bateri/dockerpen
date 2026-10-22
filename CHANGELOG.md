@@ -7,6 +7,8 @@ change what the previous one did.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-22
+
 ### Fixed
 
 - ⌃C no longer leaves the pane on the alternate screen when dockerpen runs under something that
