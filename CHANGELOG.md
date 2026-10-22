@@ -7,6 +7,13 @@ change what the previous one did.
 
 ## [Unreleased]
 
+### Fixed
+
+- ⌃C no longer leaves the pane on the alternate screen when dockerpen runs under something that
+  passes the interrupt on, as `npx dockerpen` and `npm start` do: the second interrupt could end
+  it between saying goodbye to the terminal and giving the screen back. It takes
+  `@pencere/sdk` 0.1.1, which keeps listening until the terminal is given back.
+
 ## [0.1.0] - 2026-10-22
 
 ### Added
