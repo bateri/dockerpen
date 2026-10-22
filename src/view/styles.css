@@ -217,30 +217,11 @@ input:focus-visible {
   overflow: hidden;
 }
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 2px 5px 12px;
-  height: 38px;
-}
-
 .brand-mark {
   width: 22px;
   height: 22px;
   flex: none;
   color: var(--accent);
-}
-
-.brand-name {
-  font-weight: 650;
-  letter-spacing: 0.01em;
-}
-
-.brand-host {
-  color: var(--fg-3);
-  font-size: 10.5px;
-  line-height: 1.1;
 }
 
 .nav-item {
@@ -331,7 +312,6 @@ input:focus-visible {
 .app[data-rail="compact"] .nav-label,
 .app[data-rail="compact"] .nav-count,
 .app[data-rail="compact"] .nav-key,
-.app[data-rail="compact"] .brand-text,
 .app[data-rail="compact"] .engine-card {
   display: none;
 }
@@ -339,11 +319,6 @@ input:focus-visible {
 .app[data-rail="compact"] .nav-item {
   justify-content: center;
   padding: 0;
-}
-
-.app[data-rail="compact"] .brand {
-  justify-content: center;
-  padding: 2px 0 12px;
 }
 
 .app[data-rail="compact"] .nav-badge {

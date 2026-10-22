@@ -7,8 +7,19 @@ import { PlugZap, RefreshCw } from "lucide-react";
 import { pollNow } from "../state/actions";
 import { useKeyLayer } from "../state/keys";
 import { useStore } from "../state/store";
-import { Mark } from "./Rail";
 import { Button } from "./ui";
+
+/** dockerpen's mark, which tools/icon.mjs also draws as its icon. */
+function Mark({ className }: { className?: string }) {
+  // Three containers, stacked: the second lifted, as if one were being picked out.
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="3" y="14" width="18" height="6" rx="2" fill="currentColor" opacity="0.35" />
+      <rect x="5" y="7.5" width="14" height="5.5" rx="2" fill="currentColor" opacity="0.7" />
+      <rect x="7" y="2" width="10" height="4.5" rx="1.8" fill="currentColor" />
+    </svg>
+  );
+}
 
 export function BootScreen() {
   return (

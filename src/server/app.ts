@@ -6,7 +6,6 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { hostname, userInfo } from "node:os";
 
 import {
   StatsSampler,
@@ -100,18 +99,7 @@ export class Dockerpen {
   boot(): Boot {
     const returned = this.returned;
     this.returned = undefined;
-    let user = "";
-    try {
-      user = userInfo().username;
-    } catch {
-      // A user without an entry in the password file still runs programs.
-    }
-    return {
-      ui: this.ui,
-      ...(returned ? { returned } : {}),
-      user,
-      hostname: hostname(),
-    };
+    return { ui: this.ui, ...(returned ? { returned } : {}) };
   }
 
   /** Whether the pane can be handed to a command: a terminal, and the docker command to run there. */

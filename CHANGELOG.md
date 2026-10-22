@@ -9,10 +9,16 @@ change what the previous one did.
 
 ### Added
 
-- dockerpen's icon, the mark of three stacked containers its view shows, beside its name above
-  the view in a terminal that draws program icons (bateri), and beside the server in MCP clients
-  that show them. It comes for a dark ground and a light one, as PNGs inside the program, since a
-  terminal draws only the icons it is given and fetches none.
+- dockerpen's icon, its mark of three stacked containers, beside its name above the view in a
+  terminal that draws program icons (bateri), and beside the server in MCP clients that show
+  them. It comes for a dark ground and a light one, as PNGs inside the program, since a terminal
+  draws only the icons it is given and fetches none.
+
+### Changed
+
+- The rail starts with the sections: the mark, the name and the user and machine at its top are
+  gone, since the terminal says them above the view (its strip in bateri names the program, with
+  its icon, and the machine it runs on), as an MCP Apps host names the app it shows.
 
 ## [0.1.1] - 2026-10-22
 

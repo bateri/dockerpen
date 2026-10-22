@@ -1,7 +1,7 @@
-// Draws dockerpen's icon, the mark the view shows at the top of its rail (Rail.tsx: three
+// Draws dockerpen's icon, its mark (the Mark in src/view/components/Screens.tsx: three
 // containers stacked, the middle one lifted), as PNGs in data: URIs, and writes them to
 // src/server/icon.ts. A terminal draws a program's icon only from the bytes it is given, so
-// the server carries them; run this again after changing the shapes here and in Rail.tsx.
+// the server carries them; run this again after changing the shapes here and there.
 //
 //   node tools/icon.mjs
 //
@@ -11,7 +11,7 @@
 import { writeFileSync } from "node:fs";
 import { deflateSync, crc32 } from "node:zlib";
 
-/** The mark in Rail.tsx's 24-unit box: x, y, width, height, corner radius, opacity. */
+/** The mark in its 24-unit box: x, y, width, height, corner radius, opacity. */
 const MARK = [
   [3, 14, 18, 6, 2, 0.35],
   [5, 7.5, 14, 5.5, 2, 0.7],

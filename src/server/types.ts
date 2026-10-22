@@ -178,8 +178,6 @@ export interface Boot {
   ui: UiState;
   /** What the pane was handed to, when the view comes back from it. */
   returned?: Handoff;
-  user: string;
-  hostname: string;
 }
 
 export interface ContainerDetail {

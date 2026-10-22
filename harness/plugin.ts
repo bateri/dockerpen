@@ -49,6 +49,8 @@ export function harness(): Plugin {
           const c = await connect();
           let result: unknown;
           if (request.url === "/__harness/tools") result = await c.listTools();
+          // The server's name and icons, which a terminal draws on the strip above the view.
+          else if (request.url === "/__harness/server") result = c.getServerVersion() ?? {};
           else {
             const { name, arguments: args } = JSON.parse(await body(request)) as {
               name: string;

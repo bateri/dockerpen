@@ -8,17 +8,6 @@ import { go, useStore } from "../state/store";
 import { memory, percent } from "../lib/format";
 import { Sparkline } from "./ui";
 
-export function Mark({ className }: { className?: string }) {
-  // Three containers, stacked: the second lifted, as if one were being picked out.
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="3" y="14" width="18" height="6" rx="2" fill="currentColor" opacity="0.35" />
-      <rect x="5" y="7.5" width="14" height="5.5" rx="2" fill="currentColor" opacity="0.7" />
-      <rect x="7" y="2" width="10" height="4.5" rx="1.8" fill="currentColor" />
-    </svg>
-  );
-}
-
 export function Rail() {
   const section = useStore((s) => s.ui.section);
   const containers = useStore((s) => s.containers);
@@ -27,7 +16,6 @@ export function Rail() {
   const networks = useStore((s) => s.networks);
   const engine = useStore((s) => s.engine);
   const totals = useStore((s) => s.totals);
-  const boot = useStore((s) => s.boot);
   const jobs = useStore((s) => s.jobs);
   const events = useStore((s) => s.events);
   const liveFrom = useStore((s) => s.liveFrom);
@@ -47,17 +35,6 @@ export function Rail() {
 
   return (
     <nav className="rail" aria-label="Sections">
-      <div className="brand">
-        <Mark className="brand-mark" />
-        <div className="brand-text" style={{ minWidth: 0 }}>
-          <div className="brand-name">dockerpen</div>
-          <div className="brand-host ellipsis">
-            {boot
-              ? `${boot.user ? `${boot.user}@` : ""}${boot.hostname.replace(/\.local$|\.lan$/, "")}`
-              : ""}
-          </div>
-        </div>
-      </div>
       {SECTIONS.map((s) => (
         <button
           key={s.id}

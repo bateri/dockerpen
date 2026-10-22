@@ -178,6 +178,40 @@ function themeOf(p: Palette): "dark" | "light" {
   return luminance(parse(p.background)) < luminance(parse(p.foreground)) ? "dark" : "light";
 }
 
+/** The strip's height, as bateri's (`view_strip::HEIGHT`): the pane's less this is the view's. */
+const STRIP = 32;
+
+interface StripIcon {
+  src: string;
+  sizes?: string[];
+  theme?: "light" | "dark";
+}
+
+/** The strip's side of an icon on a Retina screen, as bateri asks (`ICON_PIXELS`). */
+const ICON_PIXELS = 32;
+
+/**
+ * The icon a terminal draws for a ground, as pencere picks one (`icon::pick`): one made for that
+ * ground before one for either, never one for the other ground; then the smallest that is at
+ * least `ICON_PIXELS`, else the largest. Only a data: URI is drawn, as a terminal fetches none.
+ */
+function pickIcon(icons: StripIcon[], theme: "light" | "dark"): StripIcon | undefined {
+  const side = (icon: StripIcon) => Number(/^(\d+)x/.exec(icon.sizes?.[0] ?? "")?.[1] ?? 0);
+  const rank = (icon: StripIcon) => [
+    icon.theme === theme ? 0 : 1,
+    side(icon) < ICON_PIXELS ? 1 : 0,
+    side(icon) < ICON_PIXELS ? -side(icon) : side(icon),
+  ];
+  return icons
+    .filter((icon) => icon.src.startsWith("data:") && (!icon.theme || icon.theme === theme))
+    .sort((a, b) => {
+      const [x, y] = [rank(a), rank(b)];
+      return x[0]! - y[0]! || x[1]! - y[1]! || x[2]! - y[2]!;
+    })[0];
+}
+
+let server: { name?: string; title?: string; icons?: StripIcon[] } = {};
+
 const frame = document.getElementById("view") as HTMLIFrameElement;
 const themeSelect = document.getElementById("theme") as HTMLSelectElement;
 const sizeSelect = document.getElementById("size") as HTMLSelectElement;
@@ -201,12 +235,12 @@ const bare = params.has("bare");
 if (bare) document.body.classList.add("bare");
 
 const size = () => {
-  if (bare) return { name: "bare", width: window.innerWidth, height: window.innerHeight - 24 };
+  if (bare) return { name: "bare", width: window.innerWidth, height: window.innerHeight - STRIP };
   if (sizeSelect.value === "fit") {
     return {
       name: "fit",
       width: window.innerWidth - 32,
-      height: window.innerHeight - 36 - 32 - 24,
+      height: window.innerHeight - 36 - 32 - STRIP,
     };
   }
   return SIZES.find((s) => s.name === sizeSelect.value) ?? SIZES[0]!;
@@ -221,6 +255,21 @@ function place(): void {
   const p = palette();
   strip.style.background = css(toward(parse(p.background), parse(p.foreground), 0.08));
   strip.style.color = p.dim ?? css(toward(parse(p.foreground), parse(p.background), 1 / 3));
+  // The picture is picked again with the theme, as bateri does each time it paints the strip.
+  const icon = pickIcon(server.icons ?? [], themeOf(p));
+  const image = document.getElementById("strip-icon") as HTMLImageElement;
+  if (icon) image.src = icon.src;
+  else image.removeAttribute("src");
+}
+
+/** The program and the view, as the strip names them: the server's title or name, the tool's title. */
+async function nameTheStrip(): Promise<void> {
+  server = (await fetch("/__harness/server").then((r) => r.json())) as typeof server;
+  const program = server.title ?? server.name ?? "";
+  document.getElementById("strip-program")!.textContent = program;
+  const title = (tool as { title?: string } | undefined)?.title ?? "";
+  document.getElementById("strip-title")!.textContent = title === program ? "" : title;
+  place();
 }
 
 function context() {
@@ -269,6 +318,7 @@ window.addEventListener("message", async (event) => {
         tools: { name: string }[];
       };
       tool = listed.tools.find((t) => t.name === "show_docker");
+      void nameTheStrip();
       answer({
         protocolVersion: "2026-01-26",
         hostInfo: { name: "dockerpen-harness", version: "0.0.0" },
