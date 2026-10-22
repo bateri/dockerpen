@@ -19,6 +19,16 @@ change what the previous one did.
 - The rail starts with the sections: the mark, the name and the user and machine at its top are
   gone, since the terminal says them above the view (its strip in bateri names the program, with
   its icon, and the machine it runs on), as an MCP Apps host names the app it shows.
+- A selected row of the image, volume and network lists is outlined whole, as in the container
+  list, instead of marked by a bar at its left.
+
+### Fixed
+
+- The first row of a list no longer touches the line under the list's header when it is hovered
+  or selected: every list keeps the same gap there, and keeps it while rows scroll under the
+  header.
+- A row chosen with the keys in the image, volume and network lists is no longer left under
+  their header when the list scrolls to show it.
 
 ## [0.1.1] - 2026-10-22
 
