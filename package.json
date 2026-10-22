@@ -1,6 +1,6 @@
 {
   "name": "dockerpen",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Docker, in the terminal pane: containers, logs, stats, images, volumes and networks as a real interface, over plain ssh",
   "license": "GPL-3.0-or-later",
   "keywords": [
