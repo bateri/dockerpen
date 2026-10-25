@@ -1051,10 +1051,9 @@ local function load_list(section)
 			S.lists[section] = result[section]
 			if section == "volumes" and not result.sized then
 				net.ask("volume_sizes", nil, function(counted, failed)
-					if not failed then
-						S.volume_sizes = counted.sizes
-						bump()
-					end
+					-- A count that failed leaves no sizes, and the list says so and not "counting".
+					S.volume_sizes = failed and {} or counted.sizes
+					bump()
 				end)
 			end
 		end
@@ -2497,7 +2496,7 @@ local function overview(c, w)
 				P.button(
 					"d:labels",
 					S.show_labels and "Hide" or ("Show " .. #keys),
-					{ h = 20, px = 7, size = SIZE.small }
+					{ key = "v", h = 20, px = 7, size = SIZE.small }
 				)
 			)
 		)
@@ -3587,7 +3586,7 @@ local HELP = {
 			{ "s  r  p", "start or stop, restart, pause or resume" },
 			{ "e  F", "a shell in it, its log as it comes (in the terminal)" },
 			{ "l  i  [ ]", "logs, inspect, the tab before and after" },
-			{ "K  d", "kill, remove (both ask first)" },
+			{ "K  d  z", "kill, remove (both ask first), take back the last stop" },
 			{ "f  P  o", "next filter, group by project, sort" },
 			{ "y  .", "copy the id, the menu of the row" },
 		},
@@ -3687,7 +3686,13 @@ function overlays.toasts()
 		el:child(b.div():w(3):h(16):rounded(1.5):bg(role):no_shrink())
 		el:child(b.div():min_w(0):child(T(item.text, "foreground", SIZE.small + 1):truncate()))
 		if item.action then
-			el:child(P.button("toast.action:" .. index, item.action.label, { h = 22, px = 8, size = SIZE.small + 0.5 }))
+			el:child(
+				P.button(
+					"toast.action:" .. index,
+					item.action.label,
+					{ key = index == #S.toasts and "z" or nil, h = 22, px = 8, size = SIZE.small + 0.5 }
+				)
+			)
 		end
 		stack:child(el)
 	end
@@ -4553,6 +4558,9 @@ function keys.containers(key, mods, g)
 		elseif key == "v" and S.tab == "env" then
 			S.show_secrets = not S.show_secrets
 			return true
+		elseif key == "v" and S.tab == "overview" then
+			S.show_labels = not S.show_labels
+			return true
 		end
 	elseif list_navigation(key) then
 		return true
@@ -4679,6 +4687,19 @@ function keys.press(key, mods)
 	if key == "?" then
 		S.help = true
 		return true
+	end
+	if key == "z" then
+		-- What the newest toast that offers a way back offers (a stop can be undone).
+		for index = #S.toasts, 1, -1 do
+			local item = S.toasts[index]
+			if item.action then
+				table.remove(S.toasts, index)
+				item.action.run()
+				bump()
+				return true
+			end
+		end
+		return false
 	end
 	for _, section in ipairs(SECTIONS) do
 		if key == section.key then

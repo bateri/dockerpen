@@ -28,7 +28,7 @@ end
 -- The size of each volume in bytes, by name, as `docker system df -v` counts them. Counting
 -- can take the engine a while on a busy machine.
 function M.sizes()
-	local output = cli.run({ "system", "df", "-v", "--format", "json" }, { timeout = 120 })
+	local output = cli.run({ "system", "df", "-v", "--format", "json" }, { timeout = 50 })
 	local parsed = parse.object(string.match(output, "{.*}") or "")
 	local sizes = {}
 	for _, volume in ipairs(parsed and parsed.Volumes or {}) do

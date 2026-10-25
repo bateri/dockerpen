@@ -48,8 +48,8 @@ const ID = (letter) => letter.repeat(64);
  * Runs dockerpen in a pane: the page subscribes to `topics` and makes `calls` (each `[method,
  * params]`), then `then` happens. Gives what the page was told, by the number it asked with.
  */
-function pane({ calls = [], topics = [], env = {}, then = ["--then", "interrupt"], limit = 20, args = [] } = {}) {
-  const hostArgs = ["--size", "100x30", "--limit", String(limit)];
+function pane({ calls = [], topics = [], env = {}, then = ["--then", "interrupt"], limit = 20, args = [], host = [] } = {}) {
+  const hostArgs = ["--size", "100x30", "--limit", String(limit), ...host];
   for (const [topic, params] of topics) hostArgs.push("--subscribe", `${topic}=${JSON.stringify(params ?? {})}`);
   for (const [method, params] of calls) hostArgs.push("--call", `${method}=${JSON.stringify(params ?? {})}`);
   const run = spawnSync(HOST, [...hostArgs, ...then, "--", BIN, ...args], {
@@ -206,9 +206,12 @@ test("the containers topic tells the list as docker gives it, with what is read 
   assert.equal(byName["toolbox"].project, undefined);
   assert.deepEqual(byName["shop-web-1"].ports, [{ public: 8088, private: 80, type: "tcp", ip: "0.0.0.0" }]);
   assert.deepEqual(byName["toolbox"].ports, [{ private: 6379, type: "tcp" }]);
-  assert.deepEqual(ran().sort(), [
+  // What it ran to tell this: the list, and the engine. (The events it follows are started at the
+  // same time, and may not have said so yet when the first value goes: they are not told apart
+  // from a list that came first.)
+  const ran_first = ran().filter((line) => !line.startsWith("events "));
+  assert.deepEqual(ran_first.sort(), [
     "context inspect --format {{.Endpoints.docker.Host}}",
-    "events --format json --filter type=container --filter type=image --filter type=volume --filter type=network",
     "info --format {{json .}}",
     "ps -a --no-trunc --format json",
   ]);
@@ -461,10 +464,34 @@ test("nothing is run for a topic nobody listens to", () => {
 });
 
 test("a stream is stopped when the page stops listening", () => {
-  // The program ends with the pane; what it started must not outlast it.
-  pane({ topics: [["stats"], ["events"], ["logs", { id: "shop-api-1" }]], then: ["--then", "interrupt"] });
-  const left = spawnSync("ps", ["-A", "-o", "command="], { encoding: "utf8" }).stdout;
-  assert.ok(!left.includes(`${STAND_IN}/docker`) || !left.includes(dir), "no stand-in docker is left running");
+  // The page gives each subscription up after what the stream says first (the topics of `stats` and
+  // `events` begin with what is kept, and the second push is the stream's own); the stand-in
+  // docker says, when it is ended, that it was. A stream left running would not.
+  for (const [topic, params, pushes] of [
+    ["stats", {}, 2],
+    ["events", {}, 2],
+    ["logs", { id: "shop-api-1" }, 1],
+  ]) {
+    pane({ topics: [[topic, params]], then: ["--then", "wait"], limit: 6, host: ["--cancel-after", String(pushes)] });
+    assert.ok(
+      existsSync(join(dir, "state", `${topic}-stopped`)),
+      `docker ${topic} was stopped when the page stopped listening`,
+    );
+    rmSync(join(dir, "state", `${topic}-stopped`));
+  }
+});
+
+test("and a stream is ended with the pane, whatever it was doing", () => {
+  pane({ topics: [["logs", { id: "shop-api-1" }]], then: ["--then", "interrupt"] });
+  const pid = Number(readFileSync(join(dir, "state", "logs-pid"), "utf8"));
+  assert.ok(pid > 0, "docker logs ran");
+  let alive = true;
+  try {
+    process.kill(pid, 0);
+  } catch {
+    alive = false;
+  }
+  assert.ok(!alive, `docker logs (${pid}) ended with dockerpen`);
 });
 
 // ---- images, volumes, networks, the disk ----------------------------------------------------

@@ -31,6 +31,7 @@ change what the previous one did.
 
 - `dockerpen --text` prints the containers as text, whatever the terminal is, and `--help` and
   `--version` say what they say.
+- `z` takes back the last stop from the keyboard, as the button on the toast does.
 - `⇧→` and `⇧←` read the lines of a log further to the right and back, and `0` returns them to
   their start.
 - The log of a container that was stopped and started again goes on from the line it ended
@@ -42,7 +43,8 @@ change what the previous one did.
   `container_logs`, `disk_usage`) are not in this one.
 - The command palette, and opening a published port in the browser: a page of the kit has one
   text field to give and cannot ask its terminal to open a link.
-- Dragging the edge of the detail to resize it.
+- Dragging the edge of the detail to resize it, and the pulse and the spinner a row had while a
+  container ran or was changing state: a row says it in a word (`stopping…`), and its colour.
 
 ## [0.2.1] - 2026-10-22
 

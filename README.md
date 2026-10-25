@@ -73,7 +73,7 @@ keys do where you are, and `?` lists them all.
 | `e`, `F`                   | a shell in the container, its logs as they come: in the terminal         |
 | `l`, `i`, `[` `]`          | logs, inspect, previous and next tab                                     |
 | `Tab`                      | the list or the detail                                                   |
-| `K`, `d`                   | kill, remove (both ask first)                                            |
+| `K`, `d`, `z`              | kill, remove (both ask first), take back the last stop                   |
 | `/`, `f`, `P`, `o`         | filter, next filter, group by compose project, sort                      |
 | `y`, `.`                   | copy the id, the menu of the row                                         |
 | `u`, `c`                   | pull an image, clean up                                                  |

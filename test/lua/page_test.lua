@@ -156,6 +156,13 @@ t.test("s stops what runs and starts what does not, with one call, and the row s
 	t.has(page_texts(k), "Undo", "a stop can be taken back")
 	k:click("toast.action:1")
 	t.eq(k:last_call("act").params, { ids = { data.id("a") }, action = "start" })
+	-- The same from the keyboard.
+	local again = opened()
+	again:key("down")
+	again:key("s")
+	again:answer("act", { outcomes = { { id = data.id("a"), name = "shop-api-1", ok = true } } })
+	again:key("z")
+	t.eq(again:last_call("act").params, { ids = { data.id("a") }, action = "start" })
 end)
 
 t.test("what is marked is acted on together", function()

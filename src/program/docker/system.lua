@@ -46,7 +46,7 @@ local KINDS = {
 -- volumes and build cache, how many there are, how many are in use, their size and what of it
 -- nothing uses, in bytes.
 function M.usage()
-	local output = cli.run({ "system", "df", "--format", "json" }, { timeout = 120 })
+	local output = cli.run({ "system", "df", "--format", "json" }, { timeout = 50 })
 	local usage = {}
 	for _, kind in pairs(KINDS) do
 		usage[kind] = { count = 0, active = 0, size = 0, reclaimable = 0 }

@@ -25,6 +25,17 @@ broken)
 	;;
 esac
 
+# Stays as a stream does, until it is ended; says in $STANDIN_STATE that it was (as the stream it
+# is named for), so that a test can tell a stream that was stopped from one that was left.
+linger() {
+	if [ -n "$STANDIN_STATE" ]; then
+		echo $$ > "$STANDIN_STATE/$1-pid"
+		trap 'echo stopped > "$STANDIN_STATE/$1-stopped"; exit 0' TERM
+	fi
+	sleep 60 &
+	wait
+}
+
 # How many times this command has been started.
 started() {
 	[ -n "$STANDIN_STATE" ] || { echo 1; return; }
@@ -56,12 +67,12 @@ stats)
 		echo "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?" >&2
 		exit 1
 	fi
-	sleep 60
+	linger stats
 	;;
 events)
 	started events > /dev/null
 	cat "$here/events.jsonl"
-	sleep 60
+	linger events
 	;;
 logs)
 	follow=no tail=all since=
@@ -82,7 +93,7 @@ logs)
 		fi
 		if [ "$stream" = err ]; then printf '%s\n' "$line" >&2; else printf '%s\n' "$line"; fi
 	done < "$file"
-	[ "$follow" = yes ] && [ "$STANDIN_FOLLOW" != ends ] && sleep 60
+	[ "$follow" = yes ] && [ "$STANDIN_FOLLOW" != ends ] && linger logs
 	;;
 start | stop | restart | pause | unpause | kill | rm)
 	command="$1"
