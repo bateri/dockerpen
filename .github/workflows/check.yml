@@ -19,7 +19,7 @@ permissions:
 
 env:
   # The commit of pencere the runner, the stand-in terminal and the kit's page API are taken from.
-  PENCERE_REF: 99774ced3c912bc82cced4c2a23876b8dfd1e3c0
+  PENCERE_REF: bebc1d26134b8f8f2d74f60bffd6d9dec4d344ae
 
 jobs:
   check:

@@ -12,6 +12,81 @@ local M = {}
 
 local PARTS = { "00-core", "10-element", "20-memory", "30-json", "40-page" }
 
+-- The globals a page may use: the ones the kit's interpreter gives it. Anything else is a name the
+-- page misspelt or a local it forgot, which Luau would not catch until the line ran.
+local function strict_globals()
+	return setmetatable({}, {
+		__index = function(_, name)
+			local value = _G[name]
+			if value == nil then
+				error("the page reads a global that does not exist: " .. tostring(name), 2)
+			end
+			return value
+		end,
+	})
+end
+
+-- The path of what `request` names, from the file `from` (both relative to the view's directory):
+-- `./x` and `../x`, by Luau's rules for requiring by string.
+local function resolve(from, request)
+	assert(
+		string.sub(request, 1, 2) == "./" or string.sub(request, 1, 3) == "../",
+		"require: not a relative path: " .. request
+	)
+	local parts = {}
+	for part in string.gmatch(from, "[^/]+") do
+		parts[#parts + 1] = part
+	end
+	parts[#parts] = nil
+	for part in string.gmatch(request, "[^/]+") do
+		if part == ".." then
+			assert(#parts > 0, "require: out of the view: " .. request)
+			parts[#parts] = nil
+		elseif part ~= "." then
+			parts[#parts + 1] = part
+		end
+	end
+	return table.concat(parts, "/")
+end
+
+-- The page, loaded as a terminal loads it: `page.lua` of the view's directory, which requires the
+-- other scripts of the directory, each run once with globals of its own (the kit's, and nothing it
+-- did not give), a cycle an error.
+function M.load_page(page_path)
+	local dir = string.match(page_path, "^(.*)/[^/]*$")
+	local loaded, loading = {}, {}
+	local function load(name, chain)
+		if loaded[name] ~= nil then
+			return loaded[name]
+		end
+		assert(not loading[name], "require cycle: " .. table.concat(chain, " -> ") .. " -> " .. name)
+		loading[name] = true
+		chain[#chain + 1] = name
+		local file, source
+		for _, candidate in ipairs({ name .. ".luau", name .. ".lua", name .. "/init.luau", name .. "/init.lua" }) do
+			local ok, text = pcall(runner.fs.read, dir .. "/" .. candidate)
+			if ok and text then
+				file, source = candidate, text
+				break
+			end
+		end
+		assert(source, "require: no script at " .. name)
+		local chunk, err = loadstring(source, "@" .. file)
+		assert(chunk, err)
+		local env = strict_globals()
+		rawset(env, "require", function(request)
+			return load(resolve(file, request), chain)
+		end)
+		setfenv(chunk, env)
+		local value = chunk()
+		chain[#chain] = nil
+		loading[name] = nil
+		loaded[name] = value == nil and true or value
+		return loaded[name]
+	end
+	return load("page", {})
+end
+
 local Kit = {}
 Kit.__index = Kit
 
@@ -53,10 +128,7 @@ function M.start(prelude_dir, page_path)
 		assert(chunk, err)
 		chunk()
 	end
-	local source = runner.fs.read(page_path)
-	local chunk, err = loadstring(source, "@page")
-	assert(chunk, err)
-	self.page = chunk()
+	self.page = M.load_page(page_path)
 	pencere.start(self.page)
 	self.kit = pencere
 	return self
