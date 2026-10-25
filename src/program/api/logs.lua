@@ -26,7 +26,7 @@ local BATCH_BYTES = 200 * 1024
 local BATCH_WAIT = 0.05
 
 local schema = params.object({
-	id = params.string(1),
+	id = params.ident(),
 	-- Lines from the end to start at; ignored when `since` is given.
 	tail = params.optional(params.integer(0, M.MOST_TAIL)),
 	-- The time (as the page was told it) of the last line it has: a log that is followed again

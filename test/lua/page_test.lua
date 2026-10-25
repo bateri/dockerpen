@@ -537,6 +537,40 @@ t.test("the processes are asked for while they are looked at, and again after a 
 	t.eq(#k:calls_of("processes"), 2, "and again after two seconds")
 end)
 
+t.test("a container with thousands of processes and a variable of a megabyte stays a page the kit takes", function()
+	local k = opened()
+	k:key("down")
+	k:key("enter")
+	k:render(1300, 760, 102)
+	local detail = {}
+	for key, value in pairs(data.detail) do
+		detail[key] = value
+	end
+	detail.env = { { key = "BIG", value = string.rep("x", 1000000) } }
+	for n = 1, 600 do
+		detail.env[#detail.env + 1] = { key = "V" .. n, value = "v" }
+	end
+	k:answer("detail", detail)
+	k:key("]")
+	k:key("]")
+	k:render(1300, 760, 103)
+	t.ok(kit.count(k.root) < 20000, "elements: " .. kit.count(k.root))
+	for _, text in ipairs(page_texts(k)) do
+		t.ok(#text < 65536, "a line of text is cut: " .. #text)
+	end
+	t.has(page_texts(k), "and 101 more", "the variables that do not fit are counted")
+	k:key("]")
+	k:render(1300, 760, 104)
+	local rows = {}
+	for n = 1, 5000 do
+		rows[n] = { tostring(n), "root", "0:00", "sleep " .. n }
+	end
+	k:answer("processes", { titles = { "PID", "USER", "TIME", "COMMAND" }, rows = rows })
+	k:render(1300, 760, 105)
+	t.ok(kit.count(k.root) < 20000, "elements: " .. kit.count(k.root))
+	t.has(page_texts(k), "and 4700 more")
+end)
+
 t.test("inspect is the engine's answer, a line at a time", function()
 	local k = opened()
 	k:key("down")
@@ -871,7 +905,7 @@ t.test("everything has a key: the help lists them, and ? opens it", function()
 	local texts = page_texts(k)
 	t.has(texts, "Keys")
 	t.has(texts, "start or stop, restart, pause or resume")
-	t.has(texts, "a shell in it, its log as it comes: in the terminal")
+	t.has(texts, "a shell in it, its log as it comes (in the terminal)")
 	k:key("escape")
 	k:render(1300, 760, 103)
 	t.lacks(page_texts(k), "Keys")

@@ -56,7 +56,7 @@ function M.calls(session)
 	end)
 
 	calls.image_remove = call.new(
-		params.object({ ids = params.some(params.string(1), MOST), force = params.optional(params.boolean()) }),
+		params.object({ ids = params.some(params.ident(), MOST), force = params.optional(params.boolean()) }),
 		function(args)
 			return {
 				outcomes = remove_each(args.ids, function(id)
@@ -94,7 +94,7 @@ function M.calls(session)
 		return { sizes = sizes }
 	end)
 
-	calls.volume_remove = call.new(params.object({ names = params.some(params.string(1), MOST) }), function(args)
+	calls.volume_remove = call.new(params.object({ names = params.some(params.ident(), MOST) }), function(args)
 		session.volume_sizes = nil
 		return { outcomes = remove_each(args.names, volumes.remove) }
 	end)
@@ -105,7 +105,7 @@ function M.calls(session)
 		return { networks = networks.list() }
 	end)
 
-	calls.network_remove = call.new(params.object({ ids = params.some(params.string(1), MOST) }), function(args)
+	calls.network_remove = call.new(params.object({ ids = params.some(params.ident(), MOST) }), function(args)
 		return { outcomes = remove_each(args.ids, networks.remove) }
 	end)
 

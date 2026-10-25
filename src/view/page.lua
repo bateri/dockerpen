@@ -72,6 +72,11 @@ local FILTERS = {
 -- How many lines of a log are asked for at first, and the most (what the program allows).
 local LOG_TAIL = 10000
 local LOG_MOST = 100000
+-- The most processes, environment variables and labels the detail draws: a page is held to 20 000
+-- elements, and a container can have more of these than that.
+local PROCESSES_MOST = 300
+local ENV_MOST = 500
+local LABELS_MOST = 200
 -- How many samples of a resource a chart draws (the program keeps more).
 local SPARK = 30
 
@@ -196,7 +201,8 @@ end
 
 -- A count and its noun: `1 container`, `3 containers`.
 function fmt.count(n, noun)
-	return n .. " " .. noun .. (n == 1 and "" or "s")
+	local plural = string.find(noun, "s$") and "es" or "s"
+	return n .. " " .. noun .. (n == 1 and "" or plural)
 end
 
 -- ---- the colours a program writes into its log -----------------------------------------------
@@ -1533,8 +1539,19 @@ end
 
 local P = {}
 
+-- The longest line of text the page makes (the kit takes 64 KiB, and ends a page that makes more).
+local LINE_MOST = 4000
+
 -- A line of text in a role, a size and a weight.
 local function T(content, color, size, weight)
+	if type(content) == "string" and #content > LINE_MOST then
+		local cut = string.sub(content, 1, LINE_MOST)
+		-- Not in the middle of a character.
+		while #cut > 0 and utf8.len(cut) == nil do
+			cut = string.sub(cut, 1, -2)
+		end
+		content = cut .. "…"
+	end
 	local t = b.text(content)
 	if color then
 		t:color(color)
@@ -2485,7 +2502,11 @@ local function overview(c, w)
 			)
 		)
 		if S.show_labels then
-			for _, key in ipairs(keys) do
+			for index, key in ipairs(keys) do
+				if index > LABELS_MOST then
+					body:child(T("and " .. (#keys - LABELS_MOST) .. " more", "quiet", SIZE.small))
+					break
+				end
 				body:child(P.fact(fmt.cut(key, 18), data.labels[key]))
 			end
 		end
@@ -2519,7 +2540,11 @@ local function environment(c)
 				)
 			)
 	)
-	for _, entry in ipairs(data.env) do
+	for index, entry in ipairs(data.env) do
+		if index > ENV_MOST then
+			body:child(T("and " .. (#data.env - ENV_MOST) .. " more", "quiet", SIZE.small):mt(4))
+			break
+		end
 		local hidden = secret_like(entry.key, entry.value) and not S.show_secrets and not S.revealed_env[entry.key]
 		local id = "env:" .. entry.key
 		body:child(
@@ -2588,7 +2613,11 @@ local function processes_tab(c)
 		titles[index] = title
 	end
 	body:child(cells(titles, true))
-	for _, row in ipairs(slot.rows) do
+	for index, row in ipairs(slot.rows) do
+		if index > PROCESSES_MOST then
+			body:child(T("and " .. (#slot.rows - PROCESSES_MOST) .. " more", "quiet", SIZE.small):mt(4))
+			break
+		end
 		body:child(cells(row, false))
 	end
 	body:child(T(fmt.count(#slot.rows, "process") .. " · refreshed while you look", "quiet", SIZE.tiny + 0.5):mt(8))
@@ -3546,7 +3575,7 @@ local HELP = {
 			{ "↑ ↓  j k", "choose a row" },
 			{ "g G  Home End", "first, last" },
 			{ "⏎  →  ←", "open, fold / back" },
-			{ "1 – 6", "containers, images, volumes, networks, system, activity" },
+			{ "1 – 6", "the sections, from containers to activity" },
 			{ "Tab", "list or detail" },
 			{ "/", "filter, or search a log" },
 		},
@@ -3554,9 +3583,9 @@ local HELP = {
 	{
 		"Containers",
 		{
-			{ "space  a  A", "mark, mark all, mark none (a project is all of its containers)" },
+			{ "space  a  A", "mark, mark all, mark none; a project is all its own" },
 			{ "s  r  p", "start or stop, restart, pause or resume" },
-			{ "e  F", "a shell in it, its log as it comes: in the terminal" },
+			{ "e  F", "a shell in it, its log as it comes (in the terminal)" },
 			{ "l  i  [ ]", "logs, inspect, the tab before and after" },
 			{ "K  d", "kill, remove (both ask first)" },
 			{ "f  P  o", "next filter, group by project, sort" },
@@ -3588,8 +3617,8 @@ function overlays.help()
 		:col()
 		:gap(4)
 		:p(20)
-		:w(560)
-		:max_w(640)
+		:w_pct(92)
+		:max_w(660)
 		:rounded(10)
 		:bg("raised2")
 		:border(1, "border")

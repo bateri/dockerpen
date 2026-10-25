@@ -63,6 +63,20 @@ function M.string(minimum)
 	end
 end
 
+-- A name or an id of something docker knows: text that is not read as an option (it does not
+-- begin with a dash) and holds no line end or control character.
+function M.ident()
+	return function(value, path)
+		if type(value) ~= "string" or value == "" then
+			return wrong(path, "expected a name, got " .. describe(value))
+		end
+		if string.sub(value, 1, 1) == "-" or string.find(value, "[%c]") then
+			return wrong(path, "that is not a name docker takes")
+		end
+		return value
+	end
+end
+
 function M.integer(minimum, maximum)
 	return function(value, path)
 		if
@@ -196,6 +210,6 @@ end
 
 -- The params of a call that asks for nothing, and for one container.
 M.nothing = M.object({})
-M.one_id = M.object({ id = M.string(1) })
+M.one_id = M.object({ id = M.ident() })
 
 return M

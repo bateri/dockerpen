@@ -75,6 +75,9 @@ function M.result(args, options)
 	if not ok then
 		error(unstartable(result), 0)
 	end
+	-- What a program writes is not always text (a process's arguments, a name in a locale): what is
+	-- told on is, or it could not be told at all.
+	result.stdout, result.stderr = text.lossy(result.stdout or ""), text.lossy(result.stderr or "")
 	return result
 end
 

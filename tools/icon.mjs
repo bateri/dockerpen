@@ -1,5 +1,5 @@
-// Draws dockerpen's icon, its mark (three containers stacked, the middle one lifted; the page
-// draws the same shapes from src/assets/mark.svg), as PNGs, and writes them to
+// Draws dockerpen's icon, its mark (three containers stacked, the middle one lifted), as PNGs, and
+// writes them to
 // src/assets/icon-<side>-<theme>.png. A terminal draws a program's icon only from the bytes it is
 // given, so the program carries them (src/program/app.lua names the files); run this again after
 // changing the shapes here and there.

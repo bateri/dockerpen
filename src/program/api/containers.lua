@@ -33,7 +33,7 @@ function M.calls(session)
 	-- became of each.
 	calls.act = call.new(
 		params.object({
-			ids = params.some(params.string(1), MOST),
+			ids = params.some(params.ident(), MOST),
 			action = params.enum(table.unpack(ACTIONS)),
 			force = params.optional(params.boolean()),
 			volumes = params.optional(params.boolean()),

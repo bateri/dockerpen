@@ -74,7 +74,7 @@ function M.calls(session)
 	calls.handoff = call.new(
 		params.object({
 			kind = params.enum("shell", "logs"),
-			id = params.string(1),
+			id = params.ident(),
 			name = params.optional(params.string(1)),
 		}),
 		function(args)

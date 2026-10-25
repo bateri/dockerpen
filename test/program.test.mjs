@@ -146,8 +146,25 @@ test("a call is checked before it is run", () => {
   });
   const codes = Object.values(told.errors).flat().map((error) => error.code);
   assert.deepEqual(codes, ["bad-params", "bad-params", "bad-params", "bad-params", "bad-params", "bad-params", "bad-params"]);
-  assert.match(told.errors.detail[0].message, /id: expected a string, got number/);
+  assert.match(told.errors.detail[0].message, /id: expected a name, got number/);
   assert.deepEqual(ran(), [], "nothing was run for a call that did not fit");
+});
+
+test("a name that docker would read as an option is not passed to it", () => {
+  const told = pane({
+    calls: [
+      ["detail", { id: "--all" }],
+      ["act", { ids: ["-f"], action: "remove" }],
+      ["image_layers", { id: "line\nbreak" }],
+    ],
+  });
+  assert.deepEqual(
+    Object.values(told.errors)
+      .flat()
+      .map((error) => error.code),
+    ["bad-params", "bad-params", "bad-params"],
+  );
+  assert.deepEqual(ran(), []);
 });
 
 // ---- containers ---------------------------------------------------------------------------
