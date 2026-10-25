@@ -7,6 +7,43 @@ change what the previous one did.
 
 ## [Unreleased]
 
+### Changed
+
+- dockerpen is now one native file instead of a Node package: the program is Lua, the
+  interface is drawn by your terminal in its own font and theme (a page of the pencere kit, no
+  web view), and there is nothing to install but the file and Docker. It is made for macOS on
+  Apple silicon and for Linux on `arm64` and `x86_64`, and is taken from the releases of this
+  repository, not from npm.
+- It runs the `docker` command instead of talking to the engine's socket, so it reaches the
+  engine the way `docker` does for you: the current Docker context, `DOCKER_HOST`, a rootless
+  Docker, OrbStack, Colima, Rancher Desktop and Podman's `docker` all work with nothing to set
+  up. It needs `docker` on the `PATH`, and says so when it is not there, and says when there is
+  no engine to talk to and carries on by itself when there is again.
+- Nothing runs while nothing is shown: one `docker events` runs while the interface is up, one
+  `docker stats` only while the containers are on show, a container's log only while its log is,
+  and none of them while a shell has the pane.
+- A log is a window of rows, so a container's log of a hundred thousand lines scrolls and is
+  searched as easily as one of a hundred. The charts are the last thirty readings.
+- A project's row stands for all of its containers: `s`, `r` and `p`, and the button on the row,
+  act on them together.
+
+### Added
+
+- `dockerpen --text` prints the containers as text, whatever the terminal is, and `--help` and
+  `--version` say what they say.
+- `⇧→` and `⇧←` read the lines of a log further to the right and back, and `0` returns them to
+  their start.
+- The log of a container that was stopped and started again goes on from the line it ended
+  with, without the lines before it a second time.
+
+### Removed
+
+- The MCP server: `show_docker` and the tools a model could call (`list_containers`,
+  `container_logs`, `disk_usage`) are not in this one.
+- The command palette, and opening a published port in the browser: a page of the kit has one
+  text field to give and cannot ask its terminal to open a link.
+- Dragging the edge of the detail to resize it.
+
 ## [0.2.1] - 2026-10-22
 
 ### Fixed

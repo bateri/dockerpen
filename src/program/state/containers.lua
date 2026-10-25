@@ -14,17 +14,6 @@ local M = {}
 -- is a dozen events in a moment, and one look takes them all in.
 M.DEBOUNCE = 0.25
 
--- What a container does that changes nothing worth a new look at the list.
-local QUIET = {
-	attach = true,
-	top = true,
-	resize = true,
-	copy = true,
-	export = true,
-	["archive-path"] = true,
-	["extract-to-dir"] = true,
-}
-
 -- The feed of the containers: a value is `{ containers =, engine =, failure = }` — the list, what
 -- the engine says of itself, and why there is no list (a failure, with the last list kept).
 -- `events` is the feed of the engine's events.
@@ -78,7 +67,7 @@ function M.new(events)
 				end
 			end
 			local unwatch = events:watch(function(event)
-				if event.type == "container" and not QUIET[event.action] then
+				if event.type == "container" then
 					later()
 				end
 			end, function(state, why)

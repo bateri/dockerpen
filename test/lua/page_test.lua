@@ -178,6 +178,16 @@ t.test("a row's own verb acts on that row only", function()
 	t.eq(k:last_call("act").params, { ids = { data.id("b") }, action = "stop" })
 end)
 
+t.test("a project's row stands for all of its containers", function()
+	local k = opened()
+	k:key("s")
+	local call = k:last_call("act")
+	t.eq(call.params.action, "stop", "something of it runs, so it is stopped")
+	t.eq(#call.params.ids, 4, "the four that run, the stopped one is left")
+	k:click("verb:group:shop")
+	t.eq(#k:last_call("act").params.ids, 4)
+end)
+
 t.test("removing asks first, and says what goes with it", function()
 	local k = opened()
 	k:key("down")
@@ -431,6 +441,25 @@ t.test("the log is searched through the host's field, and n goes to the next mat
 	k:key("N")
 	k:render(1300, 760, 116)
 	t.has(page_texts(k), "9 of 10")
+end)
+
+t.test("a log is read to the right, a few characters at a time", function()
+	local k = with_log(20)
+	local function first_words()
+		for _, text in ipairs(page_texts(k)) do
+			if string.find(text, "/20 200", 1, true) then
+				return text
+			end
+		end
+		return ""
+	end
+	t.eq(first_words(), "  GET /api/orders/20 200")
+	k:key("right", { shift = true })
+	k:render(1300, 760, 107)
+	t.eq(first_words(), "rders/20 200", "sixteen characters, across the two runs the line is in")
+	k:key("0")
+	k:render(1300, 760, 108)
+	t.eq(first_words(), "  GET /api/orders/20 200")
 end)
 
 t.test("timestamps are shown when asked for", function()

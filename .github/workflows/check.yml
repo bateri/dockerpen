@@ -1,5 +1,12 @@
-# The gate on every push to main and every pull request: `make check`, on Linux and macOS,
-# the two systems dockerpen runs on.
+# The gate on every push to main and every pull request: `make check` (formatting, the program
+# built into one file, the Lua tests of the page against the kit, and the built program played in a
+# pane by pencere's stand-in terminal with a stand-in docker), on Linux and macOS.
+#
+# pencere has no release yet, so there is no runner to fetch: the job builds `pencere` and
+# `pencere-fake-host` from a checkout of pencere at the commit this was made against, and says so
+# in its summary. Moving that commit is a change of this file, and of dockerpen's page when the kit
+# moved: the page is held to that checkout's own prelude. When pencere has a release, the checkout
+# and the cargo steps go, and `pencere build --target` fetches what it needs.
 name: check
 
 on:
@@ -10,6 +17,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # The commit of pencere the runner, the stand-in terminal and the kit's page API are taken from.
+  PENCERE_REF: 99774ced3c912bc82cced4c2a23876b8dfd1e3c0
+
 jobs:
   check:
     strategy:
@@ -19,9 +30,29 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: bateri/pencere
+          ref: ${{ env.PENCERE_REF }}
+          path: pencere
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: make check
+      - name: Build the runner and the stand-in terminal from pencere
+        working-directory: pencere
+        run: |
+          cargo build --release -p pencere-cli
+          cargo build -p pencere-fake-host
+      - name: Install StyLua
+        run: cargo install stylua --locked --features luau --version 2.6.0 --root "$RUNNER_TEMP/stylua"
+      - name: make check
+        run: |
+          export PATH="$RUNNER_TEMP/stylua/bin:$PATH"
+          make check
+      - name: Say what the runner was built from
+        run: |
+          {
+            echo "### What this run was held to"
+            echo
+            echo "pencere at \`$PENCERE_REF\`: its \`pencere\` command, its \`pencere-fake-host\` and the prelude of its kit (\`kit/luau/prelude\`) that the page's tests run the page against."
+          } >> "$GITHUB_STEP_SUMMARY"

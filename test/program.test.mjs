@@ -431,7 +431,7 @@ test("the events topic tells the engine's reports, and which of them are news", 
       ["die", "shop-web-1", null],
       ["pull", "nginx:alpine", null],
     ],
-    "a container asked to stop that dies with the signal's code is not news; exec events are left out",
+    "a container asked to stop that dies with the signal's code is not news; exec events and a look at the processes are left out",
   );
   assert.equal(items[2].words, "exited with code 1");
   assert.equal(items[2].project, "shop");

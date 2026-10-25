@@ -9,8 +9,22 @@ local M = {}
 local TYPES = { "container", "image", "volume", "network" }
 
 -- What a container does that is not worth a line: running a command in it (the engine reports
--- each one of a health check) and the like.
-local NOISE = { exec_create = true, exec_start = true, exec_die = true, exec_detach = true }
+-- each one of a health check), looking at its processes (dockerpen's own, while the tab is on
+-- show), attaching to it, and the like.
+local NOISE = {
+	exec_create = true,
+	exec_start = true,
+	exec_die = true,
+	exec_detach = true,
+	top = true,
+	attach = true,
+	detach = true,
+	resize = true,
+	copy = true,
+	export = true,
+	["archive-path"] = true,
+	["extract-to-dir"] = true,
+}
 
 -- An event the engine printed as a record: its kind, what happened, to what, and the few
 -- attributes of it that say more (the image, an exit code, a signal).

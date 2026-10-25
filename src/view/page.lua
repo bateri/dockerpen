@@ -41,7 +41,6 @@ local SIZE = {
 }
 
 -- The widths of the page at which it changes shape.
-local WIDE = 1040 -- the detail sits beside the list from here
 local RAIL_FROM = 700 -- the rail of sections is a rail from here, and a strip of them below it
 local LIST_MEDIUM = 640
 local LIST_WIDE = 860
@@ -421,6 +420,7 @@ local S = {
 		scanned = 0,
 		match_at = 0,
 		new_since = 0, -- how many lines came since the person scrolled up
+		hscroll = 0, -- how many characters the lines are read to the right of their start
 		query = "",
 		runs = {}, -- the runs of the lines on show, by index, kept while they are
 		run_count = 0,
@@ -792,7 +792,14 @@ local function targets(section)
 	end
 	local rows = rows_of(section)
 	local row = rows[index_of(rows, S.cursor[section]) or 0]
-	if row and row.kind ~= "group" then
+	if row and row.kind == "group" then
+		-- A project stands for all of its containers.
+		local members = {}
+		for _, c in ipairs(row.members) do
+			members[#members + 1] = { kind = "container", id = c.id, c = c }
+		end
+		return members
+	elseif row then
 		return { row }
 	end
 	return {}
@@ -1135,6 +1142,7 @@ local function log_clear(id, tail)
 	L.matches, L.scanned, L.match_at = {}, 0, 0
 	L.runs, L.run_count = {}, 0
 	L.new_since = 0
+	L.hscroll = 0
 	L.follow = true
 end
 
@@ -1760,8 +1768,7 @@ function P.field(active, hint, width)
 	if active then
 		box:child(b.div():id("field.room"):text_field():grow(1):min_w(0):h(18))
 	else
-		local shown = S.query ~= "" and S.query or hint
-		box:child(b.div():grow(1):min_w(0):child(T(shown, S.query ~= "" and "dim" or "quiet", SIZE.body):truncate()))
+		box:child(b.div():grow(1):min_w(0):child(T(hint, "quiet", SIZE.body):truncate()))
 	end
 	return box:child(P.kbd("/"))
 end
@@ -2048,6 +2055,15 @@ local function group_row(group)
 		el:child(P.tag(group.issues .. " with " .. (group.issues == 1 and "an issue" or "issues"), "error"))
 	end
 	el:child(b.spacer())
+	if cursor or over or hovered("verb:" .. group.id) then
+		el:child(
+			P.button(
+				"verb:" .. group.id,
+				group.up > 0 and "Stop all" or "Start all",
+				{ h = 22, px = 8, size = SIZE.small + 0.5 }
+			)
+		)
+	end
 	local marks = b.div():row():gap(2):items_center():no_shrink()
 	for index, c in ipairs(group.members) do
 		if index > 14 then
@@ -2636,6 +2652,25 @@ local function log_runs(index)
 	return runs
 end
 
+-- The runs of a line without its first `n` characters: a log read further to the right.
+local function shift_runs(runs, n)
+	local out = {}
+	for _, run in ipairs(runs) do
+		local length = utf8.len(run.text) or #run.text
+		if n >= length then
+			n -= length
+		else
+			local text = run.text
+			if n > 0 then
+				text = string.sub(text, utf8.offset(text, n + 1) or (n + 1))
+			end
+			n = 0
+			out[#out + 1] = { text = text, fg = run.fg, bold = run.bold, dim = run.dim, underline = run.underline }
+		end
+	end
+	return out
+end
+
 -- One line of the log as a row of the runs it is in.
 local function log_line(index, current)
 	local err = string.byte(L.streams, index) == 101
@@ -2651,7 +2686,12 @@ local function log_line(index, current)
 		row:child(T(L.clocks[index] or "", "quiet", SIZE.small + 0.5):no_shrink())
 	end
 	local words = b.div():row():items_center():no_shrink()
-	for _, run in ipairs(log_runs(index)) do
+	local shown = log_runs(index)
+	if L.hscroll > 0 then
+		shown = shift_runs(shown, L.hscroll)
+		row:child(T("‹", "quiet", SIZE.small + 0.5):no_shrink())
+	end
+	for _, run in ipairs(shown) do
 		local role = run.fg
 		if run.dim then
 			role = "dim"
@@ -2693,36 +2733,48 @@ local function scan_log(budget)
 	return L.scanned < L.count
 end
 
-local function log_toolbar()
-	local bar = b.div():row():items_center():gap(8):h(40):px(18):no_shrink()
-	bar:child(
-		P.button(
-			"l:follow",
-			L.follow and "Following" or "Follow",
-			{ selected = L.follow, key = "End", h = 24, size = SIZE.small + 0.5 }
-		)
-	)
-	bar:child(P.button("l:time", "Timestamps", { selected = L.timestamps, key = "t", h = 24, size = SIZE.small + 0.5 }))
-	bar:child(P.field(S.field == "logs", "Search the log", 230))
+-- The bar over a log: follow, timestamps, the search and what it found. In a narrow place the
+-- search has a row of its own.
+local function log_toolbar(width)
+	local narrow = width < 600
+	local small = { h = 24, size = SIZE.small + 0.5 }
+	local function button(id, label, key, extra)
+		local options =
+			{ h = small.h, size = small.size, selected = extra and extra.selected, key = (not narrow) and key or nil }
+		return P.button(id, label, options)
+	end
+	local top = b.div():row():items_center():gap(8):h(narrow and 34 or 40):px(18):no_shrink()
+	top:child(button("l:follow", L.follow and "Following" or "Follow", "End", { selected = L.follow }))
+	top:child(button("l:time", "Timestamps", "t", { selected = L.timestamps }))
+	local search = b.div():row():items_center():gap(8):w(0):grow(1):min_w(0)
+	search:child(P.field(S.field == "logs", "Search the log", nil))
 	if L.query_on and S.query ~= "" then
 		local total = #L.matches
 		local note = total == 0 and (L.scanned < L.count and "looking…" or "no match")
 			or (string.format("%d of %d", math.max(L.match_at, 1), total) .. (L.scanned < L.count and "+" or ""))
-		bar:child(T(note, total == 0 and "dim" or "foreground", SIZE.small):no_shrink())
-		bar:child(P.button("l:prev", "Prev", { key = "N", h = 22, px = 8, size = SIZE.small, disabled = total == 0 }))
-		bar:child(P.button("l:next", "Next", { key = "n", h = 22, px = 8, size = SIZE.small, disabled = total == 0 }))
+		search:child(T(note, total == 0 and "dim" or "foreground", SIZE.small):no_shrink())
+		search:child(P.button("l:prev", "Prev", { h = 22, px = 8, size = SIZE.small, disabled = total == 0 }))
+		search:child(P.button("l:next", "Next", { h = 22, px = 8, size = SIZE.small, disabled = total == 0 }))
 	end
-	bar:child(b.spacer())
+	if narrow then
+		top:child(b.spacer())
+		if L.count >= L.tail and L.tail < LOG_MOST then
+			top:child(P.button("l:more", "Load more", { h = 22, px = 8, size = SIZE.small }))
+		end
+		top:child(T(fmt.count(L.count, "line"), "quiet", SIZE.small):no_shrink())
+		return b.div():col():no_shrink():child(top):child(b.div():row():items_center():h(34):px(18):child(search))
+	end
+	top:child(search)
 	if L.count >= L.tail and L.tail < LOG_MOST then
-		bar:child(P.button("l:more", "Load more", { key = "L", h = 22, px = 8, size = SIZE.small }))
+		top:child(P.button("l:more", "Load more", { key = "L", h = 22, px = 8, size = SIZE.small }))
 	end
-	bar:child(T(fmt.count(L.count, "line"), "quiet", SIZE.small):no_shrink())
-	return bar
+	top:child(T(fmt.count(L.count, "line"), "quiet", SIZE.small):no_shrink())
+	return top
 end
 
-local function log_tab(c)
+local function log_tab(c, width)
 	local box = b.div():col():grow(1):min_h(0)
-	box:child(log_toolbar())
+	box:child(log_toolbar(width))
 	box:child(b.div():h(1):bg(alpha("border", 0.6)):no_shrink())
 	if L.id ~= c.id then
 		return box:child(P.nothing("Opening the log…"))
@@ -2787,7 +2839,7 @@ function screens.detail(width, beside)
 	panel:child(P.tabs(TABS, S.tab, "tab:"))
 	panel:child(b.div():h(1):bg(alpha("border", 0.6)):no_shrink())
 	if S.tab == "logs" then
-		return panel:child(log_tab(c))
+		return panel:child(log_tab(c, width))
 	elseif S.tab == "inspect" then
 		return panel:child(inspect_tab(c))
 	end
@@ -3502,7 +3554,7 @@ local HELP = {
 	{
 		"Containers",
 		{
-			{ "space  a  A", "mark, mark all, mark none" },
+			{ "space  a  A", "mark, mark all, mark none (a project is all of its containers)" },
 			{ "s  r  p", "start or stop, restart, pause or resume" },
 			{ "e  F", "a shell in it, its log as it comes: in the terminal" },
 			{ "l  i  [ ]", "logs, inspect, the tab before and after" },
@@ -3517,6 +3569,7 @@ local HELP = {
 			{ "↑ ↓  PgUp PgDn", "scroll; scrolling up stops following" },
 			{ "End  t", "follow, timestamps" },
 			{ "n  N", "next match, previous match" },
+			{ "⇧←  ⇧→  0", "read further to the right, and back" },
 			{ "L", "load more lines" },
 		},
 	},
@@ -4256,7 +4309,13 @@ end
 local function log_keys(key, mods)
 	local view = views.log or 400
 	local page = math.max(view - SIZE.line * 2, SIZE.line)
-	if key == "up" or key == "k" then
+	if key == "right" and mods and mods.shift then
+		L.hscroll += 16
+	elseif key == "left" and mods and mods.shift then
+		L.hscroll = math.max(L.hscroll - 16, 0)
+	elseif key == "0" then
+		L.hscroll = 0
+	elseif key == "up" or key == "k" then
 		L.follow = false
 		scroll_by("log", -SIZE.line * 3)
 	elseif key == "down" or key == "j" then
@@ -4664,7 +4723,21 @@ function mouse.click(id, mods)
 	elseif kind == "mark" then
 		go.toggle_mark(S.section, rest)
 	elseif kind == "verb" then
-		if S.section == "containers" then
+		if S.section == "containers" and string.sub(rest, 1, 6) == "group:" then
+			S.cursor.containers = rest
+			bump()
+			local members = targets("containers")
+			local ids, running = {}, false
+			for _, row in ipairs(members) do
+				running = running or is_up(row.c)
+			end
+			for _, row in ipairs(members) do
+				if running == is_up(row.c) then
+					ids[#ids + 1] = row.id
+				end
+			end
+			act.run(ids, running and "stop" or "start")
+		elseif S.section == "containers" then
 			local c = S.by_id[rest]
 			if c then
 				S.cursor.containers = rest

@@ -1,6 +1,9 @@
 # Releasing
 
-dockerpen is published to npm as `dockerpen`, and each release is tagged `v<x.y.z>` here.
+dockerpen is released as three files on a GitHub release tagged `v<x.y.z>` here: the program for
+macOS on Apple silicon (`arm64`) and for Linux on `arm64` and `x86_64`, named
+`dockerpen-<version>-<target>`, with a `SHA256SUMS` that names the three. There is no Intel Mac file:
+bateri, the terminal that shows the interface, runs on Apple silicon only. It is not published on npm.
 Every step a machine can check is in `tools/release.mjs`, behind the `make` targets below. This
 file is the order of the steps and the reasons for them.
 
@@ -13,80 +16,74 @@ Every change a user would notice goes under `## [Unreleased]` in `CHANGELOG.md`
 ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/)), in the same commit as the change. A
 release only moves that section under a version and a date; it does not write it.
 
+## What a release needs
+
+Each of the three files is pencere's Lua runner for one target, with dockerpen's program, its
+page and its icons packed into it. So a release needs:
+
+- the `pencere` command and the runners of the three targets, of one version: `make dist` in a
+  pencere checkout makes them in its `dist/` (`pencere-<version>-<target>`). When pencere has a
+  release, `pencere build --target` fetches the runner of a target itself and `make dist` stops
+  asking for `RUNNERS`.
+- `gh`, logged in, to make the GitHub release.
+
+The files are built on the maintainer's machine and not by a workflow: an executable that a
+workflow built is one that a pushed tag changes without a maintainer's decision. CI runs the
+gate (`make check`) on a runner it builds from a pencere checkout, and a release runs it here too.
+
 ## A release
 
-From a clean `main`:
+From a clean `main`, with `PENCERE` and `FAKE_HOST` pointing at the pencere checkout's `pencere`
+command and `pencere-fake-host` if they are not where the Makefile looks:
 
-1. `make release-prepare VERSION=0.2.0` sets the version in `package.json` and the lockfile and
-   turns `## [Unreleased]` into `## [0.2.0] - <today>` with a new, empty `## [Unreleased]`
-   above it. Read the diff, then commit it as `Release dockerpen 0.2.0`.
-2. `make release` runs the gate (`make check`), then the release checks, then makes the annotated
-   tag `v0.2.0` with the changelog section as its message. Nothing is pushed.
-3. `make publish` pushes `main` and the tag in one atomic push. From here the release workflow
-   (`.github/workflows/release.yml`) takes over:
-   - it checks that the tag names the version `package.json` and the changelog carry, on `main`;
-   - it runs the gate on Linux;
-   - it stages the package on npm through trusted publishing, which also records where it was
-     built (provenance);
-   - it writes the GitHub release from the changelog section.
-4. `make approve` once the workflow has staged the version. It is not public until a maintainer
-   approves it with 2FA: the target shows the staged version (who staged it, its shasum) and
-   approves it, and npm asks for the second factor, so run it in a terminal. The same can be
-   done on npmjs.com, under the package's **Staged Packages** tab.
-5. Check it: `npm view dockerpen version`.
+1. `make release-prepare VERSION=0.3.0` sets the version in `src/program/version.lua` (the program
+   is one file with no manifest beside it, so it carries its version in its source; the
+   `package.json` of this repository is for the tests and has none) and turns
+   `## [Unreleased]` into `## [0.3.0] - <today>` with a new, empty `## [Unreleased]` above it.
+   Read the diff, then commit it as `Release dockerpen 0.3.0`.
+2. `make dist RUNNERS=<the pencere checkout's dist/>`, from that commit, on a clean tree. The
+   file names carry the version, so a `dist/release` built before the version moved is refused;
+   nothing can tell which source a `dist/release` of the right version was built from, so build
+   it after the commit and not before.
+3. `make release` runs the gate (`make check`), then the release checks, then makes the
+   annotated tag `v0.3.0` with the changelog section as its message. Nothing is pushed.
+4. `make publish` pushes `main` and the tag in one atomic push, then makes the GitHub release
+   with the changelog section as its notes, the three files and `SHA256SUMS`.
+5. Check it: `gh release view v0.3.0`.
 
 If a check fails, nothing has left the machine: fix it, amend or add a commit, and run the step
 again. A tag that was made but not pushed can be deleted with `git tag -d <tag>`. A pushed tag is
-never moved; a broken release is followed by a new version.
-
-When `@pencere/sdk` has a new minor version, `^0.1.0` does not admit it: dockerpen moves its range
-in a commit of its own, and the next release says so in its changelog.
+never moved; a broken release is followed by a new version. If the push went and `gh` failed, the
+tag is on `origin` and the release is not: make it by hand with `gh release create v0.3.0
+--verify-tag` and the files of `dist/release`.
 
 ### What the release checks refuse
 
-- a version that is not after the last, or a `package.json` that disagrees with the newest
-  changelog section;
+- a version that is not after the last, or a `src/program/version.lua` that disagrees with the
+  newest changelog section;
 - an `## [Unreleased]` section that still holds changes, or an empty release section;
 - a branch other than `main`, a working tree that is not clean, a `main` that has diverged from
   `origin/main`;
-- a tag that already exists, here or on `origin`;
-- a package without its `LICENSE`, `README.md`, `CHANGELOG.md`, server or view, or one that
-  carries its sources, tests or harness. The package is checked from `npm pack`, which builds it
-  first.
+- a tag that already exists, here or on `origin`, or a release that already exists on GitHub;
+- a `dist/release` that is not exactly the three files of this version and `SHA256SUMS`, with the
+  sum of each as listed, or whose executable for this machine does not say this version.
 
-## The first release
+## The npm package
 
-npm learns about a package from its first publish, and a trusted publisher can only be set up for
-a package that exists. Staging a package npm does not know would publish a public placeholder, so
-the workflow refuses to. The first release is therefore published from the maintainer's machine,
-with the same steps:
+dockerpen 0.2.1 is on npm, as the Node program it was. Nothing is published there any more.
+At the first release of the native file, a maintainer deprecates the old package by hand, so
+that whoever installs it is told where the files are:
 
-1. The release commit, with the changelog's first section dated.
-2. `make release`.
-3. `make publish-local` runs `npm publish` (npm asks for the second factor, so run it in a
-   terminal), waits until npm lists the version, then pushes `main` and the tag. The workflow
-   sees that the version is already on npm, stages nothing, and writes the GitHub release.
+```sh
+npm deprecate dockerpen "dockerpen is now a single native file, without Node: take it from https://github.com/bateri/dockerpen/releases"
+```
 
-npm processes a new package for a few minutes before it lists it, so the push waits, up to 15
-minutes. If the workflow's `npm` job still finds nothing, it fails with "not on npm yet" and the
-GitHub release is not written: once `npm view dockerpen version` answers, run what failed again
-(`gh run rerun <run-id> --failed`).
-
-Then, on npmjs.com, in the package's settings:
-
-- **Publishing access**, once the first release is out: require two-factor authentication and
-  disallow bypass tokens. It does not expire.
-- **Trusted publisher**, on the day of the second release, just before `make publish`: GitHub
-  Actions, organization `bateri`, repository `dockerpen`, workflow `release.yml`, no environment,
-  with "Allow npm publish" and "Allow npm dist-tag" left off, so the workflow can only stage and
-  never make a version public by itself. npm stops a trusted publisher that has not published
-  within two days of being made, and one that has stopped cannot be edited: it is deleted and made
-  again. So it is made when a release is about to use it, not after the first.
-
-From then on a version becomes public only through the workflow and a maintainer's approval.
+npm asks for the second factor, so run it in a terminal. The trusted publisher set up for
+`release.yml` on npmjs.com, if there is one, is removed in the package's settings: the workflow
+is gone. None of this is done by a commit that changes the program: it is the maintainer's word,
+at the release.
 
 ## Who releases
 
-`make publish` and `make publish-local` publish dockerpen under the project's name. Only a
-maintainer runs them. The approval on npm (`make approve`) is a second, separate decision.
-Everything before them (prepare, commit, tag) can be undone locally.
+`make publish` makes the release under the project's name. Only a maintainer runs it. Everything
+before it (prepare, commit, dist, tag) can be undone locally.
