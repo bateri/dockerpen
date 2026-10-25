@@ -6,7 +6,7 @@
 -- This is api/'s: the files of api/ know the page; docker/, state/ and terminal/ do not.
 
 local pencere = require("pencere")
-local env, json = pencere.env, pencere.json
+local env, json, time = pencere.env, pencere.json, pencere.time
 
 local call = require("api.call")
 local params = require("api.params")
@@ -39,6 +39,9 @@ function M.calls(session)
 		session.handoff_failed = nil
 		local boot = {
 			version = version,
+			-- The page has no clock of its own, only the time of its frames: it tells the time of day
+			-- from this (seconds since 1970 as the program reads it now).
+			time = time.now(),
 			hostname = pencere.os.hostname(),
 			remote = present(env.get("SSH_CONNECTION")) or present(env.get("SSH_TTY")),
 			ui = session.ui or json.null,

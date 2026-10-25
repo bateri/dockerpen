@@ -117,6 +117,7 @@ test("the page is shown the view and the program says what it is", () => {
   assert.equal(boot.ui, null);
   assert.equal(boot.section, null);
   assert.match(boot.version, /^\d+\.\d+\.\d+/);
+  assert.ok(Math.abs(boot.time - Date.now() / 1000) < 60, "the time of day, for a page that has no clock");
 });
 
 test("the command line says what the view opens on, once", () => {
