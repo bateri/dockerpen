@@ -217,6 +217,15 @@ function mouse.click(id, mods)
 			act.remove_containers()
 		elseif rest == "close" then
 			go.close()
+		elseif rest == "copyid" then
+			S.copy = c.id
+			toast.say("Copied the id", { kind = "success" })
+		elseif rest == "copyjson" then
+			local data = S.details[c.id] and S.details[c.id].data
+			if data then
+				S.copy = table.concat(data.lines, "\n")
+				toast.say("Copied the JSON", { kind = "success" })
+			end
 		elseif rest == "labels" then
 			S.show_labels = not S.show_labels
 		elseif rest == "secrets" then
@@ -257,6 +266,18 @@ function mouse.click(id, mods)
 		elseif rest == "more" then
 			log_keys("L", {})
 		end
+	elseif kind == "envcopy" then
+		local data = S.open and S.details[S.open] and S.details[S.open].data
+		for _, entry in ipairs(data and data.env or {}) do
+			if entry.key == rest then
+				S.copy = entry.key .. "=" .. entry.value
+				toast.say("Copied " .. entry.key, { kind = "success" })
+			end
+		end
+	elseif kind == "copyport" or kind == "port" then
+		local url = "http://localhost:" .. rest
+		S.copy = url
+		toast.say("Copied " .. url, { kind = "info", body = "A page cannot open a link in a browser: paste it there." })
 	elseif kind == "env" then
 		S.revealed_env[rest] = (not S.revealed_env[rest]) or nil
 	elseif kind == "layers" then

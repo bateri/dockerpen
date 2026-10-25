@@ -71,7 +71,7 @@ local function container_rows()
 	if cached and cached.rev == S.rev then
 		return cached.rows, cached.shown
 	end
-	local query = S.focus == "detail" and S.tab == "logs" and "" or S.query
+	local query = S.focus == "detail" and (S.tab == "logs" or S.tab == "env") and "" or S.query
 	local list = {}
 	for _, c in ipairs(S.containers) do
 		if status_shows(c) and container_matches(c, query) then

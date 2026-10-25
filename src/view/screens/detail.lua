@@ -23,27 +23,24 @@ local screens = {}
 
 -- What the exit code of a container that stopped says, when it says a signal's.
 local SIGNALS = {
-	[129] = "SIGHUP",
-	[130] = "SIGINT (⌃C)",
-	[131] = "SIGQUIT",
-	[134] = "SIGABRT",
-	[137] = "SIGKILL: killed, or out of memory",
-	[139] = "SIGSEGV: a crash",
-	[141] = "SIGPIPE",
-	[143] = "SIGTERM: asked to stop",
+	[130] = "interrupted (SIGINT)",
+	[134] = "aborted (SIGABRT)",
+	[137] = "killed (SIGKILL)",
+	[139] = "crashed (SIGSEGV)",
+	[143] = "terminated (SIGTERM)",
 }
 
-local SECRET = { "PASS", "SECRET", "TOKEN", "KEY", "PWD", "CREDENTIAL", "AUTH", "PRIVATE", "SALT", "SIGNATURE" }
+local SECRET = { "PASS", "SECRET", "TOKEN", "KEY", "PWD", "CREDENTIAL", "AUTH", "PRIVATE", "SALT", "COOKIE", "SESSION", "DSN" }
 
--- Whether an environment variable looks like it holds a secret: by its name, or a password in a URL.
-local function secret_like(key, value)
+-- Whether an environment variable looks like it holds a secret: by its name.
+local function secret_like(key)
 	local upper = string.upper(key)
 	for _, word in ipairs(SECRET) do
 		if string.find(upper, word, 1, true) then
 			return true
 		end
 	end
-	return string.find(value, "://[^/@%s]+:[^/@%s]+@") ~= nil
+	return false
 end
 
 -- The detail of the container that is open, as the program told it (or nil while it has not).
@@ -99,20 +96,14 @@ local function verbs_row(c, narrow)
 end
 
 -- The charts of a running container, and what it has used.
-local function usage_cards(c, wide)
+local function usage_cards(c, wide, data)
 	local sample = S.samples[c.short]
 	local series = S.series[c.short] or { cpu = {}, memory = {}, net_in = {}, net_out = {} }
 	-- A card: its name with an icon, a value with a word beside it, and a line of readings.
 	local function card(title, mark, value, small, line, role, ceiling)
 		local el = P.card():gap(0)
 		el:child(
-			b.div()
-				:row()
-				:items_center()
-				:gap(6)
-				:h(18)
-				:child(P.icon(mark, 12, "quiet"))
-				:child(T(string.upper(title), "quiet", SIZE.tiny + 0.5, 500))
+			b.div():row():items_center():gap(6):h(18):child(P.icon(mark, 12, "quiet")):child(T(string.upper(title), "quiet", SIZE.tiny + 0.5, 500))
 		)
 		local head = b.div():row():items_center():gap(5):mt(2):child(T(value, "foreground", 17, 600):truncate())
 		if small and small ~= "" then
@@ -124,60 +115,47 @@ local function usage_cards(c, wide)
 		end
 		return el
 	end
-	local running = c.state == "running" and sample ~= nil
-	local waiting = c.state == "running" and "waiting for a reading" or "not running"
-	local cpus = S.engine and S.engine.cpus or 1
+	local running = sample ~= nil
+	local waiting = "waiting for a reading"
+	local cpus = data and data.cpu_limit or 0
+	local limit = data and data.memory_limit or 0
 	local cpu = running
-			and card(
-				"CPU",
-				"cpu",
-				fmt.percent(sample.cpu),
-				cpus > 1 and "of one cpu" or "of the cpu",
-				series.cpu,
-				"accent"
-			)
+			and card("CPU", "cpu", fmt.percent(sample.cpu), cpus > 0 and ("of " .. cpus .. " cpu") or "of one cpu", series.cpu, "accent")
 		or card("CPU", "cpu", "–", waiting, {}, "accent")
-	local limit = sample and sample.memory_limit or 0
-	local host = S.engine and S.engine.memory or 0
-	local limited = limit > 0 and (host == 0 or limit < host * 0.95)
 	local memory = running
-			and card(
-				"Memory",
-				"memory-stick",
-				fmt.memory(sample.memory),
-				limited and ("of " .. fmt.memory(limit)) or "",
-				series.memory,
-				"success",
-				limited and limit or nil
-			)
+			and card("Memory", "memory-stick", fmt.memory(sample.memory), limit > 0 and ("of " .. fmt.memory(limit)) or "", series.memory, "success", limit > 0 and limit or nil)
 		or card("Memory", "memory-stick", "–", waiting, {}, "success")
 	local network
 	if running then
-		network = card("Network", "network", "", nil, series.net_in, "warning")
+		network = card("Network", "network", "", nil, nil)
 		local head = b.div():row():items_center():gap(10):mt(2)
-		head:child(T("↓ " .. fmt.rate(sample.net_in), "info", 15, 600))
-		head:child(T("↑ " .. fmt.rate(sample.net_out), "warning", 15, 600))
-		-- The value row of the card is empty: this one is its own.
+		head:child(T("↓ " .. fmt.rate(sample.net_in), "info", 14, 600))
+		head:child(T("↑ " .. fmt.rate(sample.net_out), "warning", 14, 600))
 		network.kids[2] = head
+		local lines = b.div():h(56):mt(8)
+		local both = 1
+		for _, list in ipairs({ series.net_in, series.net_out }) do
+			for _, value in ipairs(list) do
+				both = math.max(both, value)
+			end
+		end
+		lines:child(P.spark(series.net_in, "info", both))
+		lines:child(b.div():absolute():inset(0, 0, 0, 0):child(P.spark(series.net_out, "warning", both)))
+		network:child(lines)
 	else
-		network = card("Network", "network", "–", waiting, {}, "warning")
+		network = card("Network", "network", "–", waiting, {}, "info")
 	end
-	local disk = card("Disk and processes", "hard-drive", "", nil, nil, "warning")
+	local disk = card("Disk and processes", "hard-drive", "", nil, nil)
 	if running then
-		local function kv(label, value)
-			return b.div()
-				:row()
-				:items_center()
-				:h(20)
-				:child(b.div():w(80):no_shrink():child(T(label, "quiet", SIZE.small + 0.5)))
+		local function row(label, value)
+			return b.div():row():items_center():h(22):gap(14)
+				:child(b.div():w(70):no_shrink():child(T(label, "quiet", SIZE.small + 1)))
 				:child(T(value, "foreground", SIZE.body))
 		end
-		disk.kids[2] = b.div()
-			:col()
-			:mt(4)
-			:child(kv("read", fmt.rate(sample.disk_read)))
-			:child(kv("write", fmt.rate(sample.disk_write)))
-			:child(kv("processes", tostring(sample.pids)))
+		disk.kids[2] = b.div():col():mt(6)
+			:child(row("read", fmt.rate(sample.disk_read)))
+			:child(row("write", fmt.rate(sample.disk_write)))
+			:child(row("processes", tostring(sample.pids)))
 	else
 		disk.kids[2] = b.div():mt(2):child(T("–", "foreground", 17, 600))
 	end
@@ -194,170 +172,244 @@ local function usage_cards(c, wide)
 	return grid
 end
 
--- Why a container that is not running is not.
-local function why_stopped(c, data)
-	if is_up(c) or data == nil then
+-- "5m ago", or "just now".
+local function ago_long(seconds)
+	local words = seconds and ago(seconds)
+	if words == nil then
+		return nil
+	end
+	return words == "0s ago" and "just now" or words
+end
+
+-- What is wrong with a container, in a sentence, as a box over the rest: it ran out of memory, it
+-- keeps restarting, it exited with a failure, it is unhealthy. Nothing where nothing is.
+local function problem_of(c, data)
+	if data == nil then
 		return nil
 	end
 	local state = data.state
-	local card = P.card():gap(3)
-	local role = (state.exit_code ~= 0 or state.oom_killed) and "error" or "dim"
-	card:child(T("WHY IT STOPPED", "quiet", SIZE.tiny + 0.5, 600))
 	if state.oom_killed then
-		card:child(T("It ran out of memory and was killed.", "error", SIZE.body, 600))
+		return "error",
+			"Killed for running out of memory"
+				.. (data.memory_limit > 0 and (" (limit " .. fmt.memory(data.memory_limit) .. ")") or "")
+				.. "."
 	end
-	local words = state.exit_code == 0 and "Exited normally (code 0)" or ("Exited with code " .. state.exit_code)
-	if SIGNALS[state.exit_code] then
-		words = words .. " · " .. SIGNALS[state.exit_code]
+	if c.state == "restarting" or (data.restart_count > 2 and c.state ~= "running") then
+		return "warning", "Restarting: it has restarted " .. data.restart_count .. " times. The logs say why."
 	end
-	card:child(T(words, role, SIZE.body, 500):truncate())
-	if state.error ~= "" then
-		card:child(T(state.error, "error", SIZE.small):truncate())
+	if c.state == "exited" and state.exit_code ~= 0 then
+		local signal = SIGNALS[state.exit_code]
+		local when = ago_long(state.finished_at)
+		return "error",
+			"Exited with code "
+				.. state.exit_code
+				.. (signal and (", " .. signal) or "")
+				.. (when and (", " .. when) or "")
+				.. "."
+				.. (state.error ~= "" and (" " .. state.error) or "")
 	end
-	local when = state.finished_at and ago(state.finished_at)
-	if when then
-		card:child(T("Stopped " .. when, "dim", SIZE.small))
+	if state.health and state.health.status == "unhealthy" then
+		local last = state.health.log[#state.health.log]
+		local first = last and last.output and string.match(last.output, "^[^\n]*") or ""
+		return "error",
+			"Its health check has failed "
+				.. state.health.failing_streak
+				.. " times in a row"
+				.. (first ~= "" and (": " .. first) or ".")
 	end
-	return card
+	return nil
 end
 
--- What the health checks of a container say.
-local function health_card(data)
-	local health = data.state.health
-	if health == nil then
-		return nil
-	end
-	local role = health.status == "healthy" and "success" or (health.status == "unhealthy" and "error" or "warning")
-	local card = P.card():gap(3)
-	card:child(
-		b.div()
-			:row()
-			:items_center()
-			:gap(8)
-			:child(T("HEALTH", "quiet", SIZE.tiny + 0.5, 600))
-			:child(P.tag(health.status, role))
-	)
-	if health.failing_streak > 0 then
-		card:child(T(fmt.count(health.failing_streak, "check") .. " in a row failed", "error", SIZE.small))
-	end
-	if data.healthcheck then
-		card:child(T(table.concat(data.healthcheck, " "), "dim", SIZE.small):truncate())
-	end
-	for index = #health.log, math.max(#health.log - 3, 1), -1 do
-		local entry = health.log[index]
-		local output = string.gsub(entry.output or "", "%s+", " ")
-		card:child(
-			b.div()
-				:row()
-				:gap(8)
-				:child(
-					T(
-						entry.exit_code == 0 and "✓" or "✗",
-						entry.exit_code == 0 and "success" or "error",
-						SIZE.small
-					):no_shrink()
-				)
-				:child(T(output ~= "" and output or ("exit code " .. entry.exit_code), "dim", SIZE.small):truncate())
-		)
-	end
-	return card
+local function callout(role, text, width)
+	local box = b.div():row():gap(10):items_start():px(12):py(10):rounded(8):bg(alpha(role, 0.1)):border(1, alpha(role, 0.3)):no_shrink()
+	box:child(b.div():pt(1):child(P.icon("triangle-alert", 15, role)))
+	box:child(b.div():grow(1):min_w(0):child(P.paragraph(text, width - 28 - 24 - 15 - 10, "foreground", SIZE.body, nil, 4)))
+	return box
 end
 
-local function port_text(port)
+-- The title of a section, with an icon where it has one and a button at its end.
+local function section_title(label, mark, extra)
+	local row = b.div():row():items_center():gap(8):h(24):mb(3):no_shrink()
+	if mark then
+		row:child(P.icon(mark, 12, "quiet"))
+	end
+	row:child(T(string.upper(label), "quiet", SIZE.tiny + 0.5, 500))
+	if extra then
+		row:child(extra)
+	end
+	return row
+end
+
+-- One fact: what it is, and its value (an element or words, which wrap to `width`).
+local function kv(label, value, width, role)
+	local row = b.div():row():gap(14):items_start():min_h(20):no_shrink()
+	row:child(b.div():w(92):no_shrink():child(T(label, "quiet", SIZE.small + 1)))
+	if type(value) == "string" then
+		value = P.paragraph(value, width - 92 - 14, role or "foreground", SIZE.small + 1, nil, 20)
+	end
+	return row:child(b.div():grow(1):min_w(0):child(value))
+end
+
+-- A list of rows, each with the ground a step above the page.
+local function plain_row()
+	return b.div():row():items_center():gap(8):min_w(0):min_h(32):px(8):py(5):rounded(6):bg("raised1"):no_shrink()
+end
+
+local function port_row(port, width)
+	local row = plain_row()
+	local text = b.div():row():items_center():grow(1):min_w(0):clip()
 	if port.public then
-		return string.format("%s:%d → %d/%s", port.ip or "*", port.public, port.private, port.type)
+		local ip = (port.ip and port.ip ~= "0.0.0.0" and port.ip ~= "::") and (port.ip .. ":") or ""
+		text:child(T(ip .. port.public, "foreground", SIZE.small + 1, 650):no_shrink())
+		text:child(T(" → ", "quiet", SIZE.small + 1):no_shrink())
+	else
+		text:child(T("not published · ", "quiet", SIZE.small + 1):no_shrink())
 	end
-	return string.format("%d/%s (not published)", port.private, port.type)
+	text:child(T(port.private .. "/" .. port.type, "foreground", SIZE.small + 1):no_shrink())
+	row:child(text)
+	if port.public then
+		local id = "port:" .. port.public
+		row:child(P.button("copyport:" .. port.public, nil, { variant = "ghost", size = "sm", icon = "copy", icon_size = 12 }))
+		row:child(P.button(id, "Copy address", { variant = "ghost", size = "sm", icon = "external-link", icon_size = 12 }))
+	end
+	return row
 end
 
--- The overview: what it uses, why it stopped, what it is made of.
+-- The overview: what the container uses, what is wrong with it, what it is made of.
 local function overview(c, w)
 	local data = detail_data()
-	local wide = w >= 400
-	local body = b.div():col():gap(8):px(18):pt(4):pb(20)
-	body:child(usage_cards(c, wide))
-	local stopped = why_stopped(c, data)
-	if stopped then
-		body:child(stopped)
+	local width = w - 28
+	local body = b.div():col():gap(16):px(14):pt(12):pb(18):no_shrink()
+	if data ~= nil then
+		local role, text = problem_of(c, data)
+		if role then
+			body:child(callout(role, text, w))
+		end
+	end
+	if c.state == "running" then
+		body:child(usage_cards(c, w >= 400, data))
 	end
 	if data == nil then
 		local slot = S.details[c.id]
 		body:child(
-			T(slot and slot.error or "Reading the container…", slot and slot.error and "error" or "dim", SIZE.small):mt(
-				10
-			)
+			T(slot and slot.error or "Reading the container…", slot and slot.error and "error" or "quiet", SIZE.small)
 		)
 		return body
 	end
-	local health = health_card(data)
-	if health then
-		body:child(health)
+	if #data.ports > 0 then
+		local section = b.div():col():gap(4)
+		section:child(section_title("Ports"))
+		for _, port in ipairs(data.ports) do
+			section:child(port_row(port, width))
+		end
+		body:child(section)
 	end
-	body:child(P.heading("Container"))
-	body:child(P.fact("image", data.image))
-	local command = (#data.entrypoint > 0 and table.concat(data.entrypoint, " ") .. " " or "")
-		.. table.concat(data.cmd, " ")
-	body:child(P.fact("command", command ~= "" and command or (data.path .. " " .. table.concat(data.args, " "))))
-	body:child(P.fact("created", data.created and (ago(data.created) or "–") or "–"))
-	if data.state.running and data.state.started_at then
-		body:child(P.fact("started", ago(data.state.started_at) or "–"))
+	local facts = b.div():col():gap(6)
+	facts:child(section_title("Container"))
+	facts:child(kv("image", data.image, width))
+	local command = table.concat(data.entrypoint, " ")
+	command = command .. ((command ~= "" and #data.cmd > 0) and " " or "") .. table.concat(data.cmd, " ")
+	facts:child(kv("command", command ~= "" and command or "–", width))
+	facts:child(kv("created", data.created_label or "–", width))
+	if data.state.running then
+		facts:child(
+			kv(
+				"started",
+				b.div():row():gap(6)
+					:child(T(data.state.started_label or "–", "foreground", SIZE.small + 1))
+					:child(T("(" .. (ago_long(data.state.started_at) or "–") .. ")", "quiet", SIZE.small + 1)),
+				width
+			)
+		)
+	else
+		facts:child(kv("finished", data.state.finished_label or "–", width))
 	end
-	body:child(P.fact("restarts", data.restart_count .. " · policy " .. data.restart_policy))
-	body:child(P.fact("platform", data.platform ~= "" and data.platform or "–"))
-	if data.user ~= "" then
-		body:child(P.fact("user", data.user))
-	end
+	facts:child(
+		kv(
+			"restarts",
+			b.div():row():gap(6)
+				:child(T(tostring(data.restart_count), "foreground", SIZE.small + 1))
+				:child(T("· policy " .. data.restart_policy, "quiet", SIZE.small + 1)),
+			width
+		)
+	)
 	if data.working_dir ~= "" then
-		body:child(P.fact("working dir", data.working_dir))
+		facts:child(kv("working dir", data.working_dir, width))
 	end
+	if data.user ~= "" then
+		facts:child(kv("user", data.user, width))
+	end
+	local platform = b.div():row():items_center():gap(6):child(T(data.platform ~= "" and data.platform or "–", "foreground", SIZE.small + 1))
+	if data.privileged then
+		platform:child(P.tag("privileged", "warning"))
+	end
+	facts:child(kv("platform", platform, width))
 	if data.memory_limit > 0 or data.cpu_limit > 0 then
-		body:child(
-			P.fact(
+		facts:child(
+			kv(
 				"limits",
 				(data.memory_limit > 0 and (fmt.memory(data.memory_limit) .. " memory") or "")
 					.. (data.memory_limit > 0 and data.cpu_limit > 0 and " · " or "")
-					.. (data.cpu_limit > 0 and (data.cpu_limit .. " cpus") or "")
+					.. (data.cpu_limit > 0 and (data.cpu_limit .. " cpus") or ""),
+				width
 			)
 		)
 	end
-	if data.privileged then
-		body:child(P.fact("privileged", "yes", "warning"))
-	end
-	if #data.ports > 0 then
-		body:child(P.heading("Ports"))
-		for _, port in ipairs(data.ports) do
-			body:child(lines_of_text(port_text(port), port.public and "foreground" or "dim"))
-		end
-	end
+	body:child(facts)
 	if #data.networks > 0 then
-		body:child(P.heading("Networks"))
+		local section = b.div():col():gap(4)
+		section:child(section_title("Networks"))
 		for _, network in ipairs(data.networks) do
-			local aliases = #network.aliases > 0 and (" · " .. table.concat(network.aliases, ", ")) or ""
-			body:child(
-				b.div()
-					:row()
-					:gap(10)
-					:child(T(network.name, "foreground", SIZE.body, 600):no_shrink())
-					:child(T(network.ip .. aliases, "dim", SIZE.small + 0.5):truncate())
-			)
+			local row = plain_row()
+			row:child(P.icon("network", 13, "quiet"))
+			row:child(T(network.name, "foreground", SIZE.small + 1, 650):no_shrink())
+			row:child(b.div():grow(1):min_w(0):child(network.ip ~= "" and T(network.ip, "foreground", SIZE.small + 1) or T("no address", "quiet", SIZE.small + 1)))
+			if #network.aliases > 0 then
+				row:child(b.div():max_w(width * 0.4):min_w(0):child(P.line(table.concat(network.aliases, ", "), "quiet", SIZE.small + 1)))
+			end
+			section:child(row)
 		end
+		body:child(section)
 	end
 	if #data.mounts > 0 then
-		body:child(P.heading("Mounts"))
+		local section = b.div():col():gap(4)
+		section:child(section_title("Mounts"))
 		for _, mount in ipairs(data.mounts) do
-			body:child(
-				b.div():row():gap(8):child(P.tag(mount.type, "info")):child(
-					T(
-						(mount.name or mount.source)
-							.. " → "
-							.. mount.destination
-							.. (mount.rw and "" or "  read-only"),
-						"foreground",
-						SIZE.small + 0.5
-					):truncate()
+			local row = plain_row()
+			row:child(P.tag(mount.type, mount.type == "volume" and "info" or nil))
+			local named = (mount.name and mount.type == "volume")
+					and (#mount.name == 64 and string.sub(mount.name, 1, 12) or mount.name)
+				or mount.source
+			row:child(
+				b.div():grow(1):min_w(0):row():clip()
+					:child(T(named, "foreground", SIZE.small + 1):no_shrink())
+					:child(T(" → ", "quiet", SIZE.small + 1):no_shrink())
+					:child(T(mount.destination, "foreground", SIZE.small + 1):no_shrink())
+			)
+			if not mount.rw then
+				row:child(P.tag("read-only"))
+			end
+			section:child(row)
+		end
+		body:child(section)
+	end
+	if data.state.health and #data.state.health.log > 0 then
+		local section = b.div():col():gap(4)
+		section:child(section_title("Health checks", "heart-pulse"))
+		for index = #data.state.health.log, 1, -1 do
+			local entry = data.state.health.log[index]
+			local row = plain_row():items_start()
+			row:child(P.tag(entry.exit_code == 0 and "pass" or ("exit " .. entry.exit_code), entry.exit_code == 0 and "success" or "error"))
+			local output = entry.output ~= "" and entry.output or nil
+			row:child(
+				b.div():grow(1):min_w(0):child(
+					output and P.paragraph(output, width - 160, "foreground", SIZE.small + 0.5, nil, 4) or T("no output", "quiet", SIZE.small + 0.5)
 				)
 			)
+			row:child(T(ago_long(entry["end"]) or "", "quiet", SIZE.small):no_shrink())
+			section:child(row)
 		end
+		body:child(section)
 	end
 	local keys = {}
 	for key in pairs(data.labels) do
@@ -365,137 +417,152 @@ local function overview(c, w)
 	end
 	table.sort(keys)
 	if #keys > 0 then
-		body:child(
-			P.heading(
+		local section = b.div():col():gap(6)
+		section:child(
+			section_title(
 				"Labels",
-				P.button(
-					"d:labels",
-					S.show_labels and "Hide" or ("Show " .. #keys),
-					{ key = "v", h = 20, px = 7, size = SIZE.small }
-				)
+				nil,
+				P.button("d:labels", S.show_labels and "Hide" or ("Show " .. #keys), { variant = "ghost", size = "sm" })
 			)
 		)
 		if S.show_labels then
 			for index, key in ipairs(keys) do
 				if index > LABELS_MOST then
-					body:child(T("and " .. (#keys - LABELS_MOST) .. " more", "quiet", SIZE.small))
+					section:child(T("and " .. (#keys - LABELS_MOST) .. " more", "quiet", SIZE.small))
 					break
 				end
-				body:child(P.fact(fmt.cut(key, 18), data.labels[key]))
+				section:child(kv(fmt.cut(key, 14), data.labels[key], width))
 			end
 		end
+		body:child(section)
 	end
 	return body
 end
 
 -- The environment: the variables, with what looks secret hidden until asked for.
-local function environment(c)
+local function environment(c, w)
 	local data = detail_data()
+	local body = b.div():col():gap(10):px(14):pt(12):pb(18):no_shrink()
 	if data == nil then
-		return b.div():px(18):child(T("Reading the container…", "dim", SIZE.small))
+		return body:child(T("Reading the container…", "quiet", SIZE.small))
 	end
-	if #data.env == 0 then
-		return P.nothing("It has no environment variables")
-	end
-	local body = b.div():col():gap(1):px(18):pt(4):pb(20)
-	body:child(
-		b.div()
-			:row()
-			:items_center()
-			:gap(8)
-			:h(30)
-			:child(T(fmt.count(#data.env, "variable"), "dim", SIZE.small))
-			:child(b.spacer())
-			:child(
-				P.button(
-					"d:secrets",
-					S.show_secrets and "Hide secrets" or "Show secrets",
-					{ key = "v", h = 22, px = 8, size = SIZE.small }
-				)
-			)
-	)
-	for index, entry in ipairs(data.env) do
-		if index > ENV_MOST then
-			body:child(T("and " .. (#data.env - ENV_MOST) .. " more", "quiet", SIZE.small):mt(4))
-			break
+	local query = (S.field == "env" and S.query) or ""
+	local secrets = 0
+	local list = {}
+	for _, entry in ipairs(data.env) do
+		if secret_like(entry.key) and entry.value ~= "" then
+			secrets += 1
 		end
-		local hidden = secret_like(entry.key, entry.value) and not S.show_secrets and not S.revealed_env[entry.key]
-		local id = "env:" .. entry.key
-		body:child(
-			b.div()
-				:press(id)
-				:row()
-				:gap(14)
-				:items_center()
-				:h(24)
-				:px(6)
-				:rounded(5)
-				:bg(hovered(id) and alpha("foreground", 0.05) or nil)
-				:child(b.div():w(170):no_shrink():child(P.line(entry.key, "info", SIZE.small + 0.5, 600)))
-				:child(
-					b.div():grow(1):min_w(0):child(
-						P.line(
-							hidden and "••••••••  (click to show)" or entry.value,
-							hidden and "quiet" or "foreground",
-							SIZE.small + 0.5
-						)
-					)
-				)
+		if query == "" or fmt.has(entry.key .. "=" .. entry.value, query) then
+			list[#list + 1] = entry
+		end
+	end
+	local bar = b.div():row():items_center():gap(6):no_shrink()
+	bar:child(P.field(S.field == "env", "Find a variable", 200))
+	bar:child(b.spacer())
+	if secrets > 0 then
+		bar:child(
+			P.button("d:secrets", S.show_secrets and "Hide" or ("Reveal " .. secrets), {
+				variant = "ghost",
+				size = "sm",
+				icon = S.show_secrets and "eye-off" or "eye",
+				icon_size = 13,
+			})
 		)
 	end
-	return body
+	body:child(bar)
+	if #data.env == 0 then
+		return body:child(P.nothing("No environment", nil, "eye"))
+	end
+	local key_width = math.floor((w - 28) * 0.38)
+	local value_cols = P.cols(w - 28 - key_width - 34 - 16, SIZE.small + 1)
+	local rows = b.div():col():no_shrink()
+	for index, entry in ipairs(list) do
+		if index > ENV_MOST then
+			rows:child(T("and " .. (#list - ENV_MOST) .. " more", "quiet", SIZE.small):mt(4))
+			break
+		end
+		local secret = secret_like(entry.key) and entry.value ~= ""
+		local shown = not secret or S.show_secrets or S.revealed_env[entry.key]
+		local value
+		if shown then
+			if entry.value == "" then
+				value = T("empty", "quiet", SIZE.small + 1)
+			else
+				local text = entry.value
+				if #text > 1200 then
+					text = string.sub(text, 1, 1200) .. "…"
+				end
+				local col = b.div():col():min_w(0)
+				for _, line in ipairs(P.wrap(text, value_cols, 12)) do
+					col:child(T(line, "foreground", SIZE.small + 1):no_shrink())
+				end
+				value = col
+			end
+		else
+			value = T("••••••••", "quiet", SIZE.small + 1)
+		end
+		local id = (secret and "env:" or "envcopy:") .. entry.key
+		local row = b.div():row():items_start():gap(8):py(6):no_shrink()
+		row:child(b.div():w(key_width):no_shrink():child(P.line(entry.key, "info", SIZE.small + 1)))
+		row:child(b.div():grow(1):min_w(0):child(value))
+		row:child(
+			b.div():w(26):no_shrink():child(
+				P.button(id, nil, { variant = "ghost", size = "sm", icon = secret and (shown and "eye-off" or "eye") or "copy", icon_size = 12 })
+			)
+		)
+		rows:child(row)
+		rows:child(b.div():h(1):bg(alpha("border", 0.35)))
+	end
+	return body:child(rows)
 end
 
 -- The processes: what `docker top` says, refreshed while it is looked at.
-local function processes_tab(c)
+local function processes_tab(c, w)
 	local slot = S.processes
-	if c.state ~= "running" then
-		return P.nothing("It is not running", "A container that is stopped has no processes.")
+	local pad = b.div():col():px(8):pt(4):pb(16):no_shrink()
+	if c.state ~= "running" and c.state ~= "paused" then
+		return P.nothing("Not running", "A stopped container has no processes.", "cpu")
+	end
+	if slot.id == c.id and slot.error and slot.titles == nil then
+		return P.nothing("Could not list the processes", slot.error, "triangle-alert")
 	end
 	if slot.id ~= c.id or slot.titles == nil then
-		return b.div()
-			:px(18)
-			:child(T(slot.error or "Looking at the processes…", slot.error and "error" or "dim", SIZE.small))
+		return pad:child(T("Looking at the processes…", "quiet", SIZE.small):px(6))
 	end
-	local body = b.div():col():gap(1):px(18):pt(4):pb(20)
-	local widths = { 64, 80, 70 }
-	local function cells(list, head)
-		local row = b.div():row():gap(12):items_center():h(head and 24 or 22)
+	local command = nil
+	local tracks = {}
+	for index, title in ipairs(slot.titles) do
+		if string.find(title, "CMD") or string.find(title, "COMMAND") then
+			command = index
+			tracks[index] = b.range(120, 1)
+		else
+			tracks[index] = (title == "PID" or title == "PPID") and 64 or 76
+		end
+	end
+	local function row_of(list, head)
+		local row = b.div():grid(tracks):gap_x(10):items_center():h(head and 28 or 28):px(8):no_shrink()
 		for index, text in ipairs(list) do
-			local last = index == #list
-			local cell = b.div()
-			if last then
-				cell:grow(1):min_w(0)
-			else
-				cell:w(widths[index] or 80):no_shrink()
-			end
 			row:child(
-				cell:child(
-					P.line(
-						text,
-						head and "quiet" or "foreground",
-						head and SIZE.tiny + 0.5 or SIZE.small + 0.5,
-						head and 600 or 400
-					)
-				)
+				P.line(text, head and "quiet" or (index == command and "foreground" or "dim"), head and SIZE.tiny + 0.5 or SIZE.small + 1, head and 500 or nil)
 			)
 		end
 		return row
 	end
 	local titles = {}
 	for index, title in ipairs(slot.titles) do
-		titles[index] = title
+		titles[index] = string.upper(title)
 	end
-	body:child(cells(titles, true))
+	pad:child(row_of(titles, true))
+	pad:child(b.div():h(1):bg(alpha("border", 0.6)))
 	for index, row in ipairs(slot.rows) do
 		if index > PROCESSES_MOST then
-			body:child(T("and " .. (#slot.rows - PROCESSES_MOST) .. " more", "quiet", SIZE.small):mt(4))
+			pad:child(T("and " .. (#slot.rows - PROCESSES_MOST) .. " more", "quiet", SIZE.small):mt(4):px(8))
 			break
 		end
-		body:child(cells(row, false))
+		pad:child(row_of(row, false))
 	end
-	body:child(T(fmt.count(#slot.rows, "process") .. " · refreshed while you look", "quiet", SIZE.tiny + 0.5):mt(8))
-	return body
+	return pad
 end
 
 -- One line of the engine's answer, with the parts of it a person looks for in their own colours.
@@ -503,32 +570,41 @@ local function inspect_line(text)
 	local indent, key, colon, value = string.match(text, '^(%s*)("[^"]*")(:%s*)(.*)$')
 	if key == nil then
 		local indent_only, rest = string.match(text, "^(%s*)(.*)$")
-		return b.div():row():child(T(indent_only .. rest, "dim", SIZE.small + 0.5):no_shrink())
+		return b.div():row():child(T(indent_only .. rest, "dim", SIZE.small + 1):no_shrink())
 	end
 	local role = "foreground"
 	if string.sub(value, 1, 1) == '"' then
 		role = "success"
 	elseif string.match(value, "^%-?%d") then
 		role = "warning"
-	elseif string.match(value, "^true") or string.match(value, "^false") or string.match(value, "^null") then
+	elseif string.match(value, "^true") or string.match(value, "^false") then
 		role = "magenta"
+	elseif string.match(value, "^null") then
+		role = "quiet"
 	end
 	return b.div()
 		:row()
-		:child(T(indent .. key, "info", SIZE.small + 0.5):no_shrink())
-		:child(T(colon, "dim", SIZE.small + 0.5):no_shrink())
-		:child(T(value, role, SIZE.small + 0.5):truncate())
+		:child(T(indent .. key, "info", SIZE.small + 1):no_shrink())
+		:child(T(colon, "dim", SIZE.small + 1):no_shrink())
+		:child(T(value, role, SIZE.small + 1):truncate())
 end
 
 local function inspect_tab(c)
 	local data = detail_data()
 	if data == nil then
-		return b.div():px(18):child(T("Reading the container…", "dim", SIZE.small))
+		return b.div():px(14):pt(12):child(T("Reading the container…", "quiet", SIZE.small))
 	end
 	local lines = data.lines
-	return virtual("detail.inspect", #lines, 17, function(index)
-		return b.div():h(17):no_shrink():row():items_center():child(inspect_line(lines[index]))
-	end, { px = 18, pt = 4 })
+	local box = b.div():col():grow(1):min_h(0)
+	box:child(
+		b.div():row():items_center():justify_end():h(34):px(10):no_shrink():child(
+			P.button("d:copyjson", "Copy", { size = "sm", icon = "copy", icon_size = 12 })
+		)
+	)
+	box:child(virtual("detail.inspect", #lines, 19, function(index)
+		return b.div():h(19):no_shrink():row():items_center():child(inspect_line(lines[index]))
+	end, { px = 14, pt = 0 }))
+	return box
 end
 
 -- ---- the detail, as a whole --------------------------------------------------------------------------
@@ -576,9 +652,9 @@ function screens.detail(width, beside)
 	end
 	local content
 	if S.tab == "env" then
-		content = environment(c)
+		content = environment(c, width)
 	elseif S.tab == "processes" then
-		content = processes_tab(c)
+		content = processes_tab(c, width)
 	else
 		content = overview(c, width)
 	end

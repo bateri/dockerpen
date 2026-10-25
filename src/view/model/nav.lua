@@ -52,8 +52,8 @@ local function field_context(g)
 		return S.dialog.field and "dialog" or nil
 	end
 	if S.section == "containers" then
-		if S.open and S.tab == "logs" and (S.focus == "detail" or not g.beside) then
-			return "logs"
+		if S.open and (S.tab == "logs" or S.tab == "env") and (S.focus == "detail" or not g.beside) then
+			return S.tab == "logs" and "logs" or "env"
 		end
 		if S.open and not g.beside then
 			return nil

@@ -197,12 +197,17 @@ function M.detail(id)
 		}
 	end
 	local lines = parse.lines(output, MOST_RAW_LINES)
+	-- A time of day for a person, in the machine's own clock: `Oct 22, 2026, 03:31 AM`.
+	local function label(seconds)
+		return seconds and os.date("%b %d, %Y, %I:%M %p", math.floor(seconds)) or nil
+	end
 	return {
 		id = raw.Id,
 		name = (string.gsub(raw.Name or "", "^/", "")),
 		image = config.Image or "",
 		image_id = raw.Image or "",
 		created = parse.time(raw.Created),
+		created_label = label(parse.time(raw.Created)),
 		path = raw.Path or "",
 		args = raw.Args or {},
 		entrypoint = config.Entrypoint or {},
@@ -223,6 +228,8 @@ function M.detail(id)
 			error = state.Error or "",
 			started_at = parse.time(state.StartedAt),
 			finished_at = parse.time(state.FinishedAt),
+			started_label = label(parse.time(state.StartedAt)),
+			finished_label = label(parse.time(state.FinishedAt)),
 			health = health,
 		},
 		restart_count = raw.RestartCount or 0,

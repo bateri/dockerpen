@@ -454,6 +454,58 @@ function P.stack(members, colour)
 	return marks
 end
 
+-- How many characters of `size` a line `width` points wide has room for (a terminal's font has the
+-- same width for each, a little over a half of its size).
+function P.cols(width, size)
+	return math.max(math.floor(width / ((size or SIZE.body) * 0.62)), 8)
+end
+
+-- Words as lines of at most `cols` characters, cut at the spaces (and, where a word is longer than a
+-- line, in it): `{ "a line", "another" }`. At most `most` lines; the last ends in `…` where there was more.
+function P.wrap(text, cols, most)
+	local lines = {}
+	for paragraph in string.gmatch(text .. "\n", "([^\n]*)\n") do
+		local line = ""
+		for word in string.gmatch(paragraph, "%S+") do
+			while (utf8.len(word) or #word) > cols do
+				if line ~= "" then
+					lines[#lines + 1], line = line, ""
+				end
+				local cut = utf8.offset(word, cols + 1) or (#word + 1)
+				lines[#lines + 1] = string.sub(word, 1, cut - 1)
+				word = string.sub(word, cut)
+			end
+			local joined = line == "" and word or (line .. " " .. word)
+			if (utf8.len(joined) or #joined) > cols then
+				lines[#lines + 1] = line
+				line = word
+			else
+				line = joined
+			end
+		end
+		lines[#lines + 1] = line
+		if most and #lines > most then
+			break
+		end
+	end
+	if most and #lines > most then
+		while #lines > most do
+			lines[#lines] = nil
+		end
+		lines[most] = (string.gsub(lines[most], "%s*$", "")) .. "…"
+	end
+	return lines
+end
+
+-- Words in several lines, as a column of texts (see `P.wrap`).
+function P.paragraph(text, width, role, size, weight, most)
+	local col = b.div():col():min_w(0)
+	for _, line in ipairs(P.wrap(text, P.cols(width, size), most)) do
+		col:child(T(line, role, size, weight):no_shrink())
+	end
+	return col
+end
+
 -- Some words are said in a line; this cuts them to the room the line has.
 function P.line(content, role, size, weight)
 	return T(content, role or "foreground", size or SIZE.body, weight):truncate()
