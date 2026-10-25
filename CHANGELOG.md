@@ -44,7 +44,10 @@ change what the previous one did.
   container's detail and log, the other lists, System, Activity, the dialogs, the help and the
   palette. Text that the first dockerpen wrapped wraps again (the engine's numbers in the rail,
   empty screens, dialogs, toasts, the help) instead of running past its box, and a toolbar that
-  has no room cuts at its edge. Each list's field says what it filters ("Filter images").
+  has no room cuts at its edge. Each list's field says what it filters ("Filter images"), also
+  while you type in it (the terminal's field shows the page's words), and so do the palette's, the
+  log's, the environment's and the pull dialog's. Wrapped text breaks where your terminal's font
+  says, not by a guess at the width of a character.
 - A password inside a URL in a container's environment (`postgres://user:secret@…`) is hidden
   again until it is revealed.
 
