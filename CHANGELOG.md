@@ -37,6 +37,17 @@ change what the previous one did.
 - The log of a container that was stopped and started again goes on from the line it ended
   with, without the lines before it a second time.
 
+### Fixed
+
+- The interface is drawn as the first dockerpen drew it, again, where the native page had drifted
+  from it: sizes, spacing, colours and weights of the list, the rail, the status line, the
+  container's detail and log, the other lists, System, Activity, the dialogs, the help and the
+  palette. Text that the first dockerpen wrapped wraps again (the engine's numbers in the rail,
+  empty screens, dialogs, toasts, the help) instead of running past its box, and a toolbar that
+  has no room cuts at its edge. Each list's field says what it filters ("Filter images").
+- A password inside a URL in a container's environment (`postgres://user:secret@…`) is hidden
+  again until it is revealed.
+
 ### Removed
 
 - The MCP server: `show_docker` and the tools a model could call (`list_containers`,

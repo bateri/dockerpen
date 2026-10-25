@@ -57,7 +57,7 @@ local function bar_of(section, width, segments)
 		prefix = "pf:",
 		options = segments,
 		current = S.plain_filter[section] or "all",
-	}, extra)
+	}, extra, "Filter " .. section)
 end
 
 -- A list as a table: the title, the bar, the head, the rows. `spec`: `title`, `sub`, `verbs`, the
@@ -81,13 +81,13 @@ local function table_screen(section, spec, width)
 		)
 	end
 	if S.lists[section] == nil and not S.problems[section] then
-		return col:child(P.nothing("Looking…"))
+		return col:child(P.nothing("Looking…", nil, nil, width))
 	end
 	if #rows == 0 then
 		if S.query ~= "" or (S.plain_filter[section] or "all") ~= "all" then
-			return col:child(P.nothing("Nothing matches", "Try another filter.", "search-x"))
+			return col:child(P.nothing("Nothing matches", "Try another filter.", "search-x", width))
 		end
-		return col:child(P.nothing(spec.empty, spec.empty_hint, spec.lead))
+		return col:child(P.nothing(spec.empty, spec.empty_hint, spec.lead, width))
 	end
 	local tracks = spec.tracks(width)
 	col:child(parts_table.head(tracks, spec.columns(width), section == "images" and S.image_sort or nil))
@@ -136,7 +136,7 @@ local function layers_panel(image, width)
 					:px(8)
 					:rounded(11)
 					:press(id)
-					:bg(hovered(id) and "raised4" or "raised3")
+					:bg(hovered(id) and "raised3" or "raised2")
 					:child(T(name, hovered(id) and "foreground" or "dim", SIZE.small))
 			)
 		end
@@ -261,7 +261,7 @@ function screens.images(width)
 				P.line(
 					image.tags[1] and fmt.image_name(image.tags[1]) or ("<none> " .. string.sub(image.id, 1, 12)),
 					image.dangling and "quiet" or "foreground",
-					SIZE.body,
+					SIZE.small + 1,
 					600
 				)
 			)
@@ -280,7 +280,7 @@ function screens.images(width)
 				(image.size or 0) / largest,
 				#image.containers == 0 and "quiet" or "accent"
 			)
-			cells[#cells + 1] = T(age(image.created), "dim", SIZE.small + 1)
+			cells[#cells + 1] = P.line(age(image.created), "dim", SIZE.small + 1)
 			if w >= LIST_MEDIUM then
 				cells[#cells + 1] = parts_table.used_by(image.containers)
 			end
@@ -354,7 +354,12 @@ function screens.volumes(width)
 		cells = function(volume, w, largest)
 			local name = b.div():row():items_center():gap(8):min_w(0)
 			name:child(
-				P.line(volume.anonymous and string.sub(volume.name, 1, 12) or volume.name, "foreground", SIZE.body, 600)
+				P.line(
+					volume.anonymous and string.sub(volume.name, 1, 12) or volume.name,
+					"foreground",
+					SIZE.small + 1,
+					600
+				)
 			)
 			if volume.anonymous then
 				name:child(P.tag("anonymous"))
@@ -377,7 +382,7 @@ function screens.volumes(width)
 				cells[#cells + 1] = #volume.containers > 0
 						and P.line(table.concat(volume.containers, ", "), "dim", SIZE.small + 1)
 					or T("unused", "quiet", SIZE.small + 1)
-				cells[#cells + 1] = T(volume.driver or "", "quiet", SIZE.small + 1)
+				cells[#cells + 1] = P.line(volume.driver or "", "quiet", SIZE.small + 1)
 			end
 			return cells
 		end,
@@ -415,7 +420,7 @@ function screens.networks(width)
 		end,
 		cells = function(network, w)
 			local name = b.div():row():items_center():gap(8):min_w(0)
-			name:child(P.line(network.name, "foreground", SIZE.body, 600))
+			name:child(P.line(network.name, "foreground", SIZE.small + 1, 600))
 			if network.builtin then
 				name:child(P.tag("built-in"))
 			end
@@ -427,8 +432,9 @@ function screens.networks(width)
 			end
 			local cells = { name }
 			if w >= LIST_MEDIUM then
-				cells[#cells + 1] = T(network.driver or "", "dim", SIZE.small + 1)
-				cells[#cells + 1] = P.line(network.subnets[1] or "–", "dim", SIZE.small + 1)
+				cells[#cells + 1] = P.line(network.driver or "", "dim", SIZE.small + 1)
+				cells[#cells + 1] =
+					P.line(#network.subnets > 0 and table.concat(network.subnets, ", ") or "–", "dim", SIZE.small + 1)
 			end
 			if w >= LIST_WIDE then
 				cells[#cells + 1] = parts_table.used_by(network.containers, "none")

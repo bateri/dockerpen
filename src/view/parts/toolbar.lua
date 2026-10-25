@@ -14,20 +14,29 @@ local P = parts_ui.P
 
 local toolbar = {}
 
--- A verb of the whole of a screen, at the end of its title: an icon and a word, quiet.
-function toolbar.verb(id, label, name, width)
-	return P.button(
-		id,
-		(width or 1000) >= 560 and label or nil,
-		{ variant = "ghost", size = "sm", icon = name, icon_size = 13 }
-	)
+-- Whether the page is as narrow as a pane of 80 columns: there the bars keep to one line, and their
+-- verbs are icons alone.
+local function tight()
+	return S.width < 760
 end
 
--- The bar of the list of containers: the field, the states, grouping, the order.
+-- A verb of the whole of a screen, at the end of its title: an icon and a word, quiet (the icon
+-- alone on a narrow page).
+function toolbar.verb(id, label, name)
+	return P.button(id, not tight() and label or nil, { variant = "ghost", size = "sm", icon = name, icon_size = 13 })
+end
+
+-- The bar of the list of containers: the field, the states, grouping, the order. On a narrow page it
+-- keeps to one line, the field giving way first; elsewhere, where the list has less room than all of
+-- it takes, the states go to a second line.
 function toolbar.containers(width)
 	local count = counts()
-	local bar = b.div():row():items_center():gap(6):h(SIZE.bar):pb(8):px(14):no_shrink()
-	bar:child(P.field(S.field == "list", "Filter by name, image, port…", width >= 600 and 220 or nil))
+	local narrow = tight()
+	local field_width = nil
+	if not narrow and width >= 600 then
+		field_width = (S.field == "list" and S.typing) and 300 or 220
+	end
+	local field = P.field(S.field == "list", "Filter by name, image, port…", field_width, narrow and 90 or 120)
 	local options = {}
 	for _, f in ipairs(FILTERS) do
 		options[#options + 1] = {
@@ -37,22 +46,47 @@ function toolbar.containers(width)
 			tone = f.id == "issues" and "error" or nil,
 		}
 	end
-	bar:child(P.segmented("filter:", options, S.filter))
-	bar:child(P.button("group", nil, { variant = "ghost", icon = "folder-tree", icon_size = 14, selected = S.group }))
-	bar:child(P.button("sort", width >= 560 and SORT_LABELS[S.sort] or nil, {
+	local states = P.segmented("filter:", options, S.filter, narrow and 7 or 9)
+	local group = P.button(
+		"group",
+		nil,
+		{ variant = "ghost", size = "sm", icon = "folder-tree", icon_size = 14, selected = S.group }
+	)
+	local sort = P.button("sort", not narrow and SORT_LABELS[S.sort] or nil, {
 		variant = "ghost",
 		size = "sm",
 		icon = "arrow-down-wide-narrow",
 		icon_size = 13,
-	}))
-	return bar
+	})
+	if narrow or width >= 690 then
+		return b.div()
+			:row()
+			:items_center()
+			:gap(6)
+			:h(SIZE.bar)
+			:pb(8)
+			:px(14)
+			:no_shrink()
+			:child(field)
+			:child(states)
+			:child(group)
+			:child(sort)
+	end
+	local first = b.div():row():items_center():gap(6):h(SIZE.control):child(field):child(group):child(sort)
+	local second = b.div():row():items_center():h(SIZE.control):child(states)
+	return b.div():col():gap(6):pb(8):px(14):no_shrink():child(first):child(second)
 end
 
 -- The bar of a list of another kind: the field and, where it has them, the segments that narrow it.
--- `segments` is `{ prefix =, options =, current = }` or nil; `extra` an element at the end.
-function toolbar.plain(width, segments, extra)
-	local bar = b.div():row():items_center():gap(6):h(SIZE.bar):pb(8):px(14):no_shrink()
-	bar:child(P.field(S.field == "list", "Filter by name, image, port…", width >= 600 and 220 or nil))
+-- `segments` is `{ prefix =, options =, current = }` or nil; `extra` an element at the end; `hint` what
+-- the field says while it is empty ("Filter images"). The field gives way to the segments where both
+-- do not fit, and what still does not is cut at the edge rather than drawn past it.
+function toolbar.plain(width, segments, extra, hint)
+	local bar = b.div():row():items_center():gap(6):h(SIZE.bar):pb(8):px(14):no_shrink():clip()
+	local room = segments and #segments.options >= 6 and 700 or 470
+	if width >= room then
+		bar:child(P.field(S.field == "list", hint or "Filter by name, image, port…", width >= 600 and 220 or nil))
+	end
 	if segments then
 		bar:child(P.segmented(segments.prefix, segments.options, segments.current))
 	end

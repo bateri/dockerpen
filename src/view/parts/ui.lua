@@ -55,25 +55,27 @@ function P.icon(name, size, role)
 	return icon(name, size, role)
 end
 
--- A key cap: the key that does the same as what stands beside it.
-function P.kbd(label, size)
+-- A key cap: the key that does the same as what stands beside it, `box` points square at the least.
+function P.kbd(label, size, box)
+	box = box or 18
 	return b.div()
 		:row()
 		:items_center()
 		:justify_center()
-		:min_w(16)
-		:h(16)
+		:min_w(box)
+		:h(box)
 		:px(4)
 		:rounded(4)
 		:bg("raised2")
 		:border(1, alpha("border", 0.7))
 		:no_shrink()
-		:child(T(label, "dim", size or SIZE.tiny))
+		:child(T(label, "dim", size or SIZE.tiny + 0.5))
 end
 
 -- A button: a verb. `o`: `variant` ("default", "ghost", "primary", "danger", "danger-ghost"), `size`
 -- ("sm" is a little smaller), `icon` (the name of one, before the label; with no label the button is a
--- square of it), `selected` (pressed in), `disabled`.
+-- square of it), `selected` (pressed in), `disabled`, `ink` (the role of its icon and label, in
+-- place of the variant's).
 function P.button(id, label, o)
 	o = o or {}
 	local variant = o.variant or (o.primary and "primary") or (o.danger and "danger-ghost") or "default"
@@ -112,6 +114,9 @@ function P.button(id, label, o)
 		else
 			el:bg(over and (down and "raised4" or "raised3") or "raised2"):border(1, alpha("border", 0.6))
 		end
+	end
+	if o.ink and not o.disabled then
+		ink = o.ink
 	end
 	if o.icon then
 		el:child(icon(o.icon, o.icon_size or (small and 12 or 13), ink))
@@ -172,7 +177,7 @@ function P.badge(n)
 		:rounded(8)
 		:bg("error")
 		:no_shrink()
-		:child(T(tostring(n), "#ffffff", SIZE.tiny, 650))
+		:child(T(tostring(n), "background", SIZE.tiny, 650))
 end
 
 -- A ring, or a disc, of a colour.
@@ -182,11 +187,14 @@ end
 
 -- The mark of what a container is doing: a disc in a halo where it runs (red where it is unhealthy,
 -- amber while it starts), half a disc where it is paused, a ring where it is not (red where it
--- failed), a ring in the colour of the news where it is waiting for something it was asked.
+-- failed), a ring of the accent where it is waiting for something it was asked, an amber one while
+-- it restarts.
 function P.dot(c)
 	local box = b.div():row():items_center():justify_center():size(16, 16):no_shrink()
 	local _, role = state_of(c)
-	if S.busy[c.id] or c.state == "restarting" then
+	if S.busy[c.id] then
+		return box:child(ring("accent", 10))
+	elseif c.state == "restarting" then
 		return box:child(ring("warning", 10))
 	elseif c.state == "running" then
 		local colour = c.health == "unhealthy" and "error" or (c.health == "starting" and "warning" or "success")
@@ -223,6 +231,21 @@ function P.disc(role, size, solid)
 		return dot:border(1.5, role)
 	end
 	return dot:bg(role)
+end
+
+-- A disc of `size` (7) in a halo of its colour three points wide: what runs, as the engine does.
+function P.halo(role, size)
+	size = size or 7
+	local outer = size + 6
+	return b.div()
+		:size(outer, outer)
+		:rounded(outer / 2)
+		:bg(alpha(role, 0.18))
+		:row()
+		:items_center()
+		:justify_center()
+		:no_shrink()
+		:child(P.disc(role, size))
 end
 
 -- A bar that is `fraction` full (0 to 1).
@@ -330,25 +353,32 @@ function P.heading(label, extra)
 	return row
 end
 
--- A screen with nothing on it: a mark, what it is, and what to do.
-function P.nothing(title, hint, mark)
-	local col = b.div():col():items_center():gap(6):pt(54):px(20):no_shrink()
+-- A screen with nothing on it, in the middle of the room it has: a mark, what it is, and what to do,
+-- in lines of at most 46 characters (or what `width`, 400 where it is not said, has room for).
+function P.nothing(title, hint, mark, width)
+	local col = b.div():col():grow(1):items_center():justify_center():gap(8):py(40):px(20):no_shrink()
 	if mark then
 		col:child(
 			b.div()
-				:size(40, 40)
-				:rounded(20)
+				:size(44, 44)
+				:rounded(12)
 				:bg("raised1")
+				:border(1, alpha("border", 0.6))
 				:row()
 				:items_center()
 				:justify_center()
-				:mb(4)
-				:child(icon(mark, 20, "quiet"))
+				:no_shrink()
+				:child(icon(mark, 20, "dim"))
 		)
 	end
-	col:child(T(title, "dim", SIZE.body + 1))
+	col:child(T(title, "foreground", 13, 600))
 	if hint then
-		col:child(T(hint, "quiet", SIZE.small):align("center"))
+		local room = math.min((width or 400) - 40, 46 * SIZE.body * 0.62)
+		local lines = b.div():col():items_center():no_shrink()
+		for _, line in ipairs(P.wrap(hint, P.cols(room, SIZE.body))) do
+			lines:child(T(line, "dim", SIZE.body):no_shrink())
+		end
+		col:child(lines)
 	end
 	return col
 end
@@ -359,8 +389,9 @@ function P.card()
 end
 
 -- The field of the host, or what it says where it is not here. The host's text field has one
--- place at a time on the page, the room of the element that says it is one.
-function P.field(active, hint, width)
+-- place at a time on the page, the room of the element that says it is one. `width` fixes its width
+-- (else it takes what there is), `min` is the least it gives way to (120).
+function P.field(active, hint, width, min)
 	local focused = active and S.typing
 	local box = b.div()
 		:row()
@@ -374,9 +405,9 @@ function P.field(active, hint, width)
 		:border(1, focused and "accent" or alpha("border", 0.6))
 		:press("field")
 	if width then
-		box:w(width):min_w(120)
+		box:w(width):min_w(min or 120)
 	else
-		box:grow(1):min_w(120)
+		box:grow(1):min_w(min or 120)
 	end
 	box:child(icon("search", 14, "quiet"))
 	if active then
@@ -384,7 +415,7 @@ function P.field(active, hint, width)
 	else
 		box:child(b.div():grow(1):min_w(0):child(T(hint, "quiet", SIZE.body):truncate()))
 	end
-	return box:child(P.kbd("/"))
+	return box:child(P.kbd("/", SIZE.tiny + 0.5, 18))
 end
 
 -- The mark of a row that can be chosen with space: filled when it is.
@@ -393,20 +424,20 @@ function P.check(on)
 	if on then
 		return box:bg("accent"):row():items_center():justify_center():child(icon("check", 12, "background"))
 	end
-	return box:border(1.2, alpha("foreground", 0.3))
+	return box:bg("background"):border(1.5, "border")
 end
 
 -- A segmented control: `options` are `{ id =, label =, count =, tone = }`, `current` the id that is
--- on, and each one is named `prefix .. id` for a click.
-function P.segmented(prefix, options, current)
+-- on, and each one is named `prefix .. id` for a click; `seg_px` the room each has at its sides (9).
+function P.segmented(prefix, options, current, seg_px)
 	local control =
 		b.div():row():items_center():gap(1):p(2):rounded(8):bg("raised1"):border(1, alpha("border", 0.6)):no_shrink()
 	for _, option in ipairs(options) do
 		local id = prefix .. option.id
 		local active = option.id == current
-		local seg = b.div():row():items_center():gap(6):h(24):px(9):rounded(6):press(id):no_shrink()
+		local seg = b.div():row():items_center():gap(6):h(24):px(seg_px or 9):rounded(6):press(id):no_shrink()
 		if active then
-			seg:bg("raised3"):border(1, alpha("border", 0.8))
+			seg:bg("raised2"):border(1, alpha("border", 0.8))
 		elseif hovered(id) then
 			seg:bg(alpha("foreground", 0.05))
 		end

@@ -63,6 +63,8 @@ end
 -- all through, a little under this), and the size of its text.
 local CHAR = 0.62
 local LOG_TEXT = SIZE.small + 1
+-- The room of the time of a line: "12:34:56.789", twelve characters of the log's size.
+local TIME_W = math.ceil(12 * LOG_TEXT * CHAR) + 2
 
 -- The runs of a line cut into rows of `cols` characters.
 local function wrap_runs(runs, cols)
@@ -122,16 +124,17 @@ local function log_line(index, current, cols)
 		line:bg(alpha("error", 0.05))
 	end
 	for position, runs in ipairs(rows) do
-		local row = b.div():row():items_center():gap(8):h(SIZE.line):pr(12):clip():no_shrink()
+		-- The edge, then the words 10 in from it, and 10 between the time and them.
+		local row = b.div():row():items_center():gap(10):h(SIZE.line):pr(12):clip():no_shrink()
 		row:child(
 			b.div():w(2):h(SIZE.line):no_shrink():bg(err and alpha("error", 0.7) or (current and "warning" or nil))
 		)
 		if L.timestamps then
 			row:child(
 				b.div()
-					:w(90)
+					:w(TIME_W)
 					:no_shrink()
-					:child(position == 1 and T(L.clocks[index] or "", "quiet", SIZE.small):no_shrink() or b.div())
+					:child(position == 1 and T(L.clocks[index] or "", "quiet", LOG_TEXT):no_shrink() or b.div())
 			)
 		end
 		if position == 1 and L.hscroll > 0 and not L.wrap then
@@ -174,43 +177,77 @@ local function scan_log(budget)
 	return L.scanned < L.count
 end
 
+-- A switch with its word, as the first dockerpen's: a 24 track, the word in the second colour, and
+-- the ground of a hover under both.
+local function switch(id, label, on)
+	local over = ui.hover == id
+	local track = b.div():w(24):h(14):rounded(7):no_shrink():row():items_center():px(2)
+	if on then
+		track:bg("accent"):justify_end()
+	else
+		track:bg("raised2"):border(1, "border")
+	end
+	track:child(b.div():size(10, 10):rounded(5):bg(on and "background" or "dim"))
+	return b.div()
+		:row()
+		:items_center()
+		:gap(7)
+		:h(26)
+		:px(6)
+		:rounded(6)
+		:bg(over and alpha("foreground", 0.06) or nil)
+		:press(id)
+		:no_shrink()
+		:child(track)
+		:child(T(label, over and "foreground" or "dim", SIZE.body))
+end
+
 -- The bar over a log: the search and what it found, then what the log shows and does: following,
 -- the time of each line, wrapping; clearing the view, copying it, following it in the terminal.
+-- Where there is no room for all of it, the verbs go to a second line, as they wrapped.
 local function log_toolbar(width)
 	local narrow = width < 620
-	local top = b.div():row():items_center():gap(6):h(SIZE.bar + 4):px(12):pt(4):no_shrink()
+	local bar = b.div():col():no_shrink()
+	local top = b.div():row():items_center():gap(4):h(44):px(10):no_shrink()
 	top:child(P.field(S.field == "logs", "Find in logs", nil))
 	if L.query_on and S.query ~= "" then
 		local total = #L.matches
-		local note = total == 0 and (L.scanned < L.count and "…" or "0")
+		local note = total == 0 and (L.scanned < L.count and "…" or "no match")
 			or (string.format("%d/%d", math.max(L.match_at, 1), total) .. (L.scanned < L.count and "+" or ""))
-		top:child(T(note, total == 0 and "quiet" or "dim", SIZE.small):no_shrink())
-		top:child(P.switch("l:only", "only", L.only))
+		top:child(T(note, total == 0 and "quiet" or "dim", SIZE.small):no_shrink():min_w(54))
+		top:child(switch("l:only", "only", L.only))
 	end
-	top:child(P.switch("l:follow", "follow", L.follow))
-	top:child(P.switch("l:time", "time", L.timestamps))
-	top:child(P.switch("l:wrap", "wrap", L.wrap))
-	if not narrow then
-		top:child(P.icon_button("l:clear", "eraser", { icon_size = 13 }))
-		top:child(P.icon_button("l:copy", "copy", { icon_size = 13 }))
-		top:child(P.icon_button("d:follow", "arrow-right-left", { icon_size = 13 }))
+	top:child(switch("l:follow", "follow", L.follow))
+	top:child(switch("l:time", "time", L.timestamps))
+	top:child(switch("l:wrap", "wrap", L.wrap))
+	local verbs = top
+	bar:child(top)
+	if narrow then
+		verbs = b.div():row():items_center():gap(4):h(24):px(10):mb(8):no_shrink()
+		bar:child(verbs)
 	end
-	return top
+	verbs:child(P.icon_button("l:clear", "eraser", { icon_size = 13 }))
+	verbs:child(P.icon_button("l:copy", "copy", { icon_size = 13 }))
+	verbs:child(P.icon_button("d:follow", "arrow-right-left", { icon_size = 13 }))
+	bar:child(b.div():h(1):bg(alpha("border", 0.6)):no_shrink())
+	return bar
 end
 
 local function log_tab(c, width)
 	local box = b.div():col():grow(1):min_h(0)
 	box:child(log_toolbar(width))
 	if L.id ~= c.id then
-		return box:child(P.nothing("Opening the log…"))
+		return box:child(P.nothing("Opening the log…", nil, nil, width))
 	end
 	if L.count == 0 then
-		local words = L.ended and (L.ended.message ~= "" and L.ended.message or "The log has ended.")
-			or "It has written nothing yet."
-		return box:child(P.nothing(words, L.ended == nil and "Lines show here as the container writes them." or nil))
+		local words = (L.ended and L.ended.message ~= "") and L.ended.message or "Nothing written yet"
+		local hint = c.state == "running" and "Lines appear here as the container writes them."
+			or "The container wrote nothing before it stopped."
+		return box:child(P.nothing(words, hint, "square-terminal", width))
 	end
 	-- The characters a row has room for: the width of the panel less the edge, the time, the margin.
-	local cols = math.max(math.floor((width - 2 - 8 - 12 - (L.timestamps and 98 or 0)) / (LOG_TEXT * CHAR)), 10)
+	local cols =
+		math.max(math.floor((width - 2 - 10 - 12 - (L.timestamps and (TIME_W + 10) or 0)) / (LOG_TEXT * CHAR)), 10)
 	L.cols = cols
 	local searching = L.only and L.query_on and S.query ~= ""
 	local tops = nil
@@ -228,29 +265,40 @@ local function log_tab(c, width)
 	if searching then
 		box:child(virtual("log", count, SIZE.line, function(index)
 			return log_line(L.matches[index], L.matches[index] == current, cols)
-		end, { px = 0, pt = 4 }))
+		end, { px = 0, pt = 4, trail = 10 }))
 	else
 		box:child(virtual("log", count, SIZE.line, function(index)
 			return log_line(index, index == current, cols)
-		end, { px = 0, pt = 4, tops = tops }))
+		end, { px = 0, pt = 4, tops = tops, trail = 10 }))
 	end
-	if not L.follow and L.new_since > 0 then
+	-- Back to the end: a pill over the foot of the log, while it is not followed and there is more
+	-- of it than the window shows.
+	if not L.follow and log_total() > view then
 		box:child(
-			b.div():row():items_center():justify_center():h(26):no_shrink():child(
+			b.div():absolute():inset(nil, 0, 14, 0):row():justify_center():child(
 				b.div()
 					:row()
 					:items_center()
 					:gap(6)
-					:h(22)
-					:px(10)
-					:rounded(11)
+					:h(28)
+					:px(12)
+					:rounded(14)
 					:bg("accent")
+					:shadow(0, 6, 16, alpha("background", 0.6))
 					:press("l:follow")
-					:child(P.icon("arrow-down", 12, "background"))
-					:child(T(fmt.count(L.new_since, "new line"), "background", SIZE.small, 600))
+					:child(P.icon("arrow-down", 13, "background"))
+					:child(
+						T(
+							L.new_since > 0 and fmt.count(L.new_since, "new line") or "Follow",
+							"background",
+							SIZE.body,
+							600
+						)
+					)
 			)
 		)
-	elseif L.ended and not log_live() then
+	end
+	if L.ended and not log_live() then
 		box:child(
 			b.div():row():items_center():h(22):px(14):no_shrink():child(
 				T(

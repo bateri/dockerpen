@@ -17,15 +17,26 @@ local screens = {}
 
 local MARKS = { images = "layers", containers = "box", volumes = "hard-drive", build_cache = "zap" }
 
+-- A label and its value, in the engine's card: both at 12, as the original's list of them.
+local function fact(label, value)
+	return b.div()
+		:row()
+		:gap(14)
+		:min_h(22)
+		:items_start()
+		:child(b.div():w(112):no_shrink():child(T(label, "quiet", SIZE.small + 1)))
+		:child(b.div():grow(1):min_w(0):child(T(value, "foreground", SIZE.small + 1):truncate()))
+end
+
 function screens.system(width)
 	local col = b.div():col():grow(1):min_w(0):min_h(0)
 	local engine = (S.system and S.system.engine) or S.engine
 	col:child(P.title("System", engine and (engine.name .. " · Docker " .. engine.version) or nil, {
 		P.button("act:clean", "Clean up", { variant = "primary", size = "sm", icon = "sparkles", icon_size = 13 }),
 	}))
-	local body = b.div():col():gap(8):px(14):pt(4):pb(20):no_shrink()
+	local body = b.div():col():gap(16):px(14):pt(4):pb(18):no_shrink()
 	if S.problems.system then
-		body:child(T(S.problems.system, "error", SIZE.small))
+		body:child(P.paragraph(S.problems.system, width - 28, "error", SIZE.small))
 	end
 	local usage = S.system and S.system.usage
 	if usage == nil then
@@ -38,16 +49,16 @@ function screens.system(width)
 		end
 		local summary = P.card():gap(12):p(14)
 		local head = b.div():row():items_center():gap(10)
-		head:child(T("DISK", "quiet", SIZE.tiny + 0.5, 500))
+		head:child(T("DISK", "quiet", SIZE.tiny + 0.5))
 		head:child(T(fmt.bytes(total), "foreground", 22, 600))
 		if freed > 0 then
 			head:child(T(fmt.bytes(freed), "success", SIZE.body, 650)):child(T("can be freed", "dim", SIZE.body))
 		end
 		summary:child(head)
-		local bar = b.div():row():h(10):rounded(5):clip():gap(1):bg("raised2")
+		local bar = b.div():row():h(14):rounded(7):clip():gap(2):bg("raised2")
 		for _, kind in ipairs(DISK) do
 			local share = math.max(math.floor(usage[kind.key].size / math.max(total, 1) * 1000), 4)
-			bar:child(b.div():w(0):grow(share):h(10):bg(kind.role))
+			bar:child(b.div():w(0):grow(share):min_w(3):h(14):bg(kind.role))
 		end
 		summary:child(bar)
 		local legend = b.div():row():gap(14):wrap()
@@ -57,17 +68,21 @@ function screens.system(width)
 					:row()
 					:items_center()
 					:gap(6)
-					:child(P.disc(kind.role, 7))
+					:child(b.div():size(9, 9):rounded(3):no_shrink():bg(kind.role))
 					:child(T(kind.label, "dim", SIZE.small + 0.5))
 			)
 		end
 		summary:child(legend)
 		body:child(summary)
+		-- As many columns of at least 210 as there is room for, each as wide as the others.
+		local inner = math.max(width - 28, 210)
+		local columns = math.max(1, math.floor((inner + 8) / 218))
+		local card_w = (inner - (columns - 1) * 8) / columns
 		local cards = b.div():row():gap(8):wrap()
 		for index, kind in ipairs(DISK) do
 			local part = usage[kind.key]
 			local id = "free:" .. kind.key
-			local card = P.card():w(0):grow(1):min_w(210):gap(6)
+			local card = P.card():w(card_w):no_shrink():gap(8)
 			if S.system_pick == index then
 				card:bg(alpha("accent", 0.13)):border(1, alpha("accent", 0.55))
 			end
@@ -119,11 +134,11 @@ function screens.system(width)
 	end
 	if engine then
 		local card = P.card():gap(2):p(14)
-		card:child(T("ENGINE", "quiet", SIZE.tiny + 0.5, 600))
-		card:child(P.fact("runs on", engine.name))
-		card:child(P.fact("docker", engine.version))
+		card:child(b.div():mb(5):child(T("ENGINE", "quiet", SIZE.tiny + 0.5)))
+		card:child(fact("runs on", engine.name))
+		card:child(fact("docker", engine.version))
 		card:child(
-			P.fact(
+			fact(
 				"machine",
 				engine.os
 					.. "/"
@@ -134,11 +149,11 @@ function screens.system(width)
 					.. fmt.memory(engine.memory)
 			)
 		)
-		card:child(P.fact("socket", engine.endpoint ~= "" and engine.endpoint or "the docker command's own"))
+		card:child(fact("socket", engine.endpoint ~= "" and engine.endpoint or "the docker command's own"))
 		local count = counts()
-		card:child(P.fact("containers", count.running .. " running of " .. count.all))
+		card:child(fact("containers", count.running .. " running of " .. count.all))
 		if S.hostname ~= "" then
-			card:child(P.fact("dockerpen on", S.hostname .. (S.remote and " (over ssh)" or "")))
+			card:child(fact("dockerpen on", S.hostname .. (S.remote and " (over ssh)" or "")))
 		end
 		body:child(card)
 	end
