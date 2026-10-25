@@ -7,6 +7,8 @@ change what the previous one did.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-25
+
 ### Changed
 
 - dockerpen is now one native file instead of a Node package: the program is Lua, the
