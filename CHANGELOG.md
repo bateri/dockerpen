@@ -29,6 +29,13 @@ change what the previous one did.
 
 ### Added
 
+- **One line installs it.** `curl -fsSL https://raw.githubusercontent.com/bateri/dockerpen/main/install.sh | sh`
+  puts the newest release in `~/.local/bin` after checking it against the release's `SHA256SUMS`
+  (`DOCKERPEN_VERSION` takes a version, `DOCKERPEN_INSTALL` another directory). A file `curl`
+  fetches is not quarantined by macOS, as a browser's download is.
+- Each file of a release carries an attestation of the workflow that built it
+  (`gh attestation verify <file> --repo bateri/dockerpen`).
+
 - `dockerpen --text` prints the containers as text, whatever the terminal is, and `--help` and
   `--version` say what they say.
 - `z` takes back the last stop from the keyboard, as the button on the toast does.

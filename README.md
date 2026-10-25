@@ -52,10 +52,10 @@ clean-up that says what it will free before it frees it. **Activity**: what the 
 reported; a container that died, ran out of memory or turned unhealthy is also told as a
 toast wherever you are.
 
-|                                                           |                                                      |
-| --------------------------------------------------------- | ---------------------------------------------------- |
-| ![Logs with the program's own colours](docs/logs.png)     | ![The disk Docker takes](docs/system.png)            |
-| ![An 80×24 pane: the sections are a strip](docs/narrow.png) |                                                      |
+|                                                             |                                           |
+| ----------------------------------------------------------- | ----------------------------------------- |
+| ![Logs with the program's own colours](docs/logs.png)       | ![The disk Docker takes](docs/system.png) |
+| ![An 80×24 pane: the sections are a strip](docs/narrow.png) |                                           |
 
 ## The keyboard, and the mouse
 
@@ -63,21 +63,21 @@ Everything the mouse does, the keys do too, and the other way round: rows answer
 ⌘- or ⇧-click marks, right-click opens the menu of the row. The status line says what the
 keys do where you are, and `?` lists them all.
 
-|                            |                                                                          |
-| -------------------------- | ------------------------------------------------------------------------ |
-| `1`–`6`                    | containers, images, volumes, networks, system, activity                  |
-| `↑` `↓` / `j` `k`, `g` `G` | move, first, last                                                        |
-| `⏎` `→` / `←`              | open, expand / back, collapse                                            |
-| `space`, `a`, `A`          | mark (to act on many), mark all, none; a project row is all of its own  |
-| `s` `r` `p`                | start or stop, restart, pause or resume                                  |
-| `e`, `F`                   | a shell in the container, its logs as they come: in the terminal         |
-| `l`, `i`, `[` `]`          | logs, inspect, previous and next tab                                     |
-| `Tab`                      | the list or the detail                                                   |
-| `K`, `d`, `z`              | kill, remove (both ask first), take back the last stop                   |
-| `/`, `f`, `P`, `o`         | filter, next filter, group by compose project, sort                      |
-| `y`, `.`                   | copy the id, the menu of the row                                         |
-| `u`, `c`                   | pull an image, clean up                                                  |
-| `⌃C`                       | quit                                                                     |
+|                            |                                                                        |
+| -------------------------- | ---------------------------------------------------------------------- |
+| `1`–`6`                    | containers, images, volumes, networks, system, activity                |
+| `↑` `↓` / `j` `k`, `g` `G` | move, first, last                                                      |
+| `⏎` `→` / `←`              | open, expand / back, collapse                                          |
+| `space`, `a`, `A`          | mark (to act on many), mark all, none; a project row is all of its own |
+| `s` `r` `p`                | start or stop, restart, pause or resume                                |
+| `e`, `F`                   | a shell in the container, its logs as they come: in the terminal       |
+| `l`, `i`, `[` `]`          | logs, inspect, previous and next tab                                   |
+| `Tab`                      | the list or the detail                                                 |
+| `K`, `d`, `z`              | kill, remove (both ask first), take back the last stop                 |
+| `/`, `f`, `P`, `o`         | filter, next filter, group by compose project, sort                    |
+| `y`, `.`                   | copy the id, the menu of the row                                       |
+| `u`, `c`                   | pull an image, clean up                                                |
+| `⌃C`                       | quit                                                                   |
 
 `⌃C` always reaches dockerpen, and the terminal's own shortcuts stay the terminal's. The
 terminal has one text field to give a page, so the filter, the search of a log and the name
@@ -85,16 +85,19 @@ of an image to pull are all that field: what it says is what the list on show is
 
 ## Run it
 
-dockerpen is one file, with the interface inside it and nothing else to install but Docker.
-Take the file for your system from the
-[latest release](https://github.com/bateri/dockerpen/releases/latest) — macOS on Apple
-silicon, or Linux on `arm64` or `x86_64` — check it against `SHA256SUMS`, and put it on your
-`PATH` as `dockerpen`:
+dockerpen is one file, with the interface inside it and nothing else to install but Docker. One
+line puts the newest release in `~/.local/bin`, after checking it against the release's
+`SHA256SUMS`:
 
 ```sh
-chmod +x dockerpen-0.3.0-aarch64-apple-darwin
-mv dockerpen-0.3.0-aarch64-apple-darwin ~/.local/bin/dockerpen
+curl -fsSL https://raw.githubusercontent.com/bateri/dockerpen/main/install.sh | sh
 ```
+
+It is made for macOS on Apple silicon and for Linux on `arm64` and `x86_64`
+(`DOCKERPEN_VERSION=0.3.0` takes a version, `DOCKERPEN_INSTALL=<dir>` another directory). The files
+are on the [releases](https://github.com/bateri/dockerpen/releases) too, each with an attestation
+of the workflow that built it (`gh attestation verify <file> --repo bateri/dockerpen`); a file a
+browser downloads is quarantined by macOS, which `xattr -d com.apple.quarantine <file>` lifts.
 
 To see the interface you need a terminal that hosts pencere views. bateri is the first, and
 no release of it has them yet: until one does, build bateri from its `main` branch. In any
