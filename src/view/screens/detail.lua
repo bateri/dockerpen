@@ -290,7 +290,7 @@ local function kv(label, value, width, role, label_w, most)
 	local row = b.div():row():gap(14):items_start():min_h(20):no_shrink()
 	row:child(b.div():w(label_w):no_shrink():child(P.line(label, "quiet", SIZE.small + 1)))
 	if type(value) == "string" then
-		value = P.paragraph(value, width - label_w - 14, role or "foreground", SIZE.small + 1, nil, most or 20)
+		value = P.paragraph(value, width - label_w - 14, role or "foreground", SIZE.small + 1, nil, most)
 	end
 	return row:child(b.div():grow(1):min_w(0):child(value))
 end
@@ -554,7 +554,6 @@ local function environment(c, w)
 		return body:child(P.nothing("No environment", nil, "eye", w))
 	end
 	local key_width = math.floor((w - 28) * 0.38)
-	local value_cols = P.cols(w - 28 - key_width - 34 - 16, SIZE.small + 1)
 	local rows = b.div():col():no_shrink()
 	for index, entry in ipairs(list) do
 		if index > ENV_MOST then
@@ -572,11 +571,7 @@ local function environment(c, w)
 				if #text > 1200 then
 					text = string.sub(text, 1, 1200) .. "…"
 				end
-				local col = b.div():col():min_w(0)
-				for _, line in ipairs(P.wrap(text, value_cols, 12)) do
-					col:child(T(line, "foreground", SIZE.small + 1):no_shrink())
-				end
-				value = col
+				value = T(text, "foreground", SIZE.small + 1):wrap():min_w(0)
 			end
 		else
 			value = T("••••••••", "quiet", SIZE.small + 1)

@@ -112,7 +112,7 @@ function overlays.dialog()
 				:border(1, S.typing and "accent" or alpha("border", 0.8))
 				:press("field")
 				:child(P.icon("download", 14, "quiet"))
-				:child(b.div():id("field.room"):text_field():grow(1):min_w(0):h(20))
+				:child(P.room(20, "nginx:alpine"))
 		)
 		if string.gsub(text, "%s", "") ~= "" and not S.typing then
 			card:child(T("Pull " .. text, "dim", SIZE.small))

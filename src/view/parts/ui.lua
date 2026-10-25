@@ -373,12 +373,9 @@ function P.nothing(title, hint, mark, width)
 	end
 	col:child(T(title, "foreground", 13, 600))
 	if hint then
+		-- At most 46 characters a line, as the first dockerpen's `max-width: 46ch`.
 		local room = math.min((width or 400) - 40, 46 * SIZE.body * 0.62)
-		local lines = b.div():col():items_center():no_shrink()
-		for _, line in ipairs(P.wrap(hint, P.cols(room, SIZE.body))) do
-			lines:child(T(line, "dim", SIZE.body):no_shrink())
-		end
-		col:child(lines)
+		col:child(T(hint, "dim", SIZE.body):wrap():align("center"):max_w(room))
 	end
 	return col
 end
@@ -389,8 +386,10 @@ function P.card()
 end
 
 -- The field of the host, or what it says where it is not here. The host's text field has one
--- place at a time on the page, the room of the element that says it is one. `width` fixes its width
--- (else it takes what there is), `min` is the least it gives way to (120).
+-- place at a time on the page, the room of the element that says it is one; `hint` is what it says
+-- while it is empty either way (the text in its room is the host field's hint, and the page does not
+-- draw it). `width` fixes its width (else it takes what there is), `min` is the least it gives way to
+-- (120).
 function P.field(active, hint, width, min)
 	local focused = active and S.typing
 	local box = b.div()
@@ -411,11 +410,16 @@ function P.field(active, hint, width, min)
 	end
 	box:child(icon("search", 14, "quiet"))
 	if active then
-		box:child(b.div():id("field.room"):text_field():grow(1):min_w(0):h(18))
+		box:child(P.room(18, hint))
 	else
 		box:child(b.div():grow(1):min_w(0):child(T(hint, "quiet", SIZE.body):truncate()))
 	end
 	return box:child(P.kbd("/", SIZE.tiny + 0.5, 18))
+end
+
+-- The room of the host's text field, `height` tall, that says `hint` while it is empty.
+function P.room(height, hint)
+	return b.div():id("field.room"):text_field():grow(1):min_w(0):h(height):child(T(hint, "quiet", SIZE.body))
 end
 
 -- The mark of a row that can be chosen with space: filled when it is.
@@ -528,8 +532,14 @@ function P.wrap(text, cols, most)
 	return lines
 end
 
--- Words in several lines, as a column of texts (see `P.wrap`).
+-- Words in as many lines as they take in at most `width` points: the kit breaks them where the
+-- terminal's font says. With `most`, at most that many lines, the last ending in `…` where there was
+-- more: the kit does not count lines, so those are cut here, by the width of a character of the
+-- terminal's face (see `P.wrap`).
 function P.paragraph(text, width, role, size, weight, most)
+	if most == nil then
+		return T(text, role, size, weight):wrap():max_w(width):min_w(0)
+	end
 	local col = b.div():col():min_w(0)
 	for _, line in ipairs(P.wrap(text, P.cols(width, size), most)) do
 		col:child(T(line, role, size, weight):no_shrink())

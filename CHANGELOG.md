@@ -29,6 +29,13 @@ change what the previous one did.
 
 ### Added
 
+- **One line installs it.** `curl -fsSL https://raw.githubusercontent.com/bateri/dockerpen/main/install.sh | sh`
+  puts the newest release in `~/.local/bin` after checking it against the release's `SHA256SUMS`
+  (`DOCKERPEN_VERSION` takes a version, `DOCKERPEN_INSTALL` another directory). A file `curl`
+  fetches is not quarantined by macOS, as a browser's download is.
+- Each file of a release carries an attestation of the workflow that built it
+  (`gh attestation verify <file> --repo bateri/dockerpen`).
+
 - `dockerpen --text` prints the containers as text, whatever the terminal is, and `--help` and
   `--version` say what they say.
 - `z` takes back the last stop from the keyboard, as the button on the toast does.
@@ -44,7 +51,10 @@ change what the previous one did.
   container's detail and log, the other lists, System, Activity, the dialogs, the help and the
   palette. Text that the first dockerpen wrapped wraps again (the engine's numbers in the rail,
   empty screens, dialogs, toasts, the help) instead of running past its box, and a toolbar that
-  has no room cuts at its edge. Each list's field says what it filters ("Filter images").
+  has no room cuts at its edge. Each list's field says what it filters ("Filter images"), also
+  while you type in it (the terminal's field shows the page's words), and so do the palette's, the
+  log's, the environment's and the pull dialog's. Wrapped text breaks where your terminal's font
+  says, not by a guess at the width of a character.
 - A password inside a URL in a container's environment (`postgres://user:secret@…`) is hidden
   again until it is revealed.
 

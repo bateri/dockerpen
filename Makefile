@@ -1,15 +1,18 @@
 # dockerpen is one native file: pencere's Lua runner with the program (src/program/), the page
 # (src/view/page.lua) and the pictures (src/assets/) packed into it. The gate and the steps of a
 # release are here; RELEASING.md says in what order and why.
-.PHONY: check fmt lint build test test-page test-binary dist release-prepare release publish
+.PHONY: check fmt lint build test test-page test-binary test-tools dist release-prepare rehearse
 
-# `pencere` is the command of a pencere checkout, built there (cargo build --release -p
-# pencere-cli); the stand-in terminal the end-to-end tests play dockerpen in is built there too
-# (cargo build -p pencere-fake-host). Where they are not, say so:
+# `pencere` is the command that builds dockerpen: a release of it, which pencere's installer puts in
+# ~/.local/bin (curl -fsSL https://raw.githubusercontent.com/bateri/pencere/main/cli/install.sh | sh;
+# PENCERE_VERSION=<it> for the version in tools/pencere-version, the one releases are built with),
+# or one built in a pencere checkout (cargo build --release -p pencere-cli). The stand-in terminal
+# the end-to-end tests play dockerpen in has no release: it is built in a pencere checkout (cargo
+# build -p pencere-fake-host). Where they are not where the Makefile looks, say so:
 #
-#   make check PENCERE=../pencere-lua/target/release/pencere \
-#              FAKE_HOST=../pencere-lua/target/debug/pencere-fake-host
-PENCERE ?= ../pencere/target/release/pencere
+#   make check PENCERE=../pencere/target/release/pencere \
+#              FAKE_HOST=../pencere/target/debug/pencere-fake-host
+PENCERE ?= $(shell command -v pencere 2>/dev/null || echo ../pencere/target/release/pencere)
 FAKE_HOST ?= ../pencere/target/debug/pencere-fake-host
 # The Lua files are formatted with StyLua (cargo install stylua --locked --features luau).
 STYLUA ?= stylua
@@ -28,7 +31,7 @@ lint:
 
 # build makes dist/dockerpen, the program for this machine, as one file.
 build:
-	@test -x "$(PENCERE)" || { echo "build: the pencere command is not at $(PENCERE): build it in a pencere checkout (cargo build --release -p pencere-cli), then make build PENCERE=<it>"; exit 1; }
+	@test -x "$(PENCERE)" || { echo "build: the pencere command is not at $(PENCERE): install it (see PENCERE at the top of the Makefile), then make build PENCERE=<it>"; exit 1; }
 	"$(PENCERE)" build --name dockerpen -o dist/dockerpen
 
 # test-page runs the page against the kit's page API, with the program's pieces it leans on, in
@@ -44,7 +47,11 @@ test-binary:
 	@test -x "$(FAKE_HOST)" || { echo "test-binary: pencere-fake-host is not at $(FAKE_HOST): build it in a pencere checkout (cargo build -p pencere-fake-host), then make check FAKE_HOST=<it>"; exit 1; }
 	PENCERE_FAKE_HOST="$(FAKE_HOST)" DOCKERPEN_BIN=dist/dockerpen node --test test/program.test.mjs
 
-test: test-page test-binary
+# test-tools runs the tests of the installer (install.sh) against a stand-in for GitHub.
+test-tools:
+	node --test test/install.test.mjs
+
+test: test-page test-binary test-tools
 
 # check is the gate: formatting, the program built, the page's tests and the built program held
 # to what the page expects of it.
@@ -52,38 +59,30 @@ check: lint build test
 
 # dist makes the program for the three targets dockerpen ships (Apple silicon Macs and both Linux
 # architectures; bateri, the terminal that shows the view, runs on Apple silicon only) into
-# dist/release, with the SHA256SUMS that names them. The runners come from a pencere checkout's
-# `make dist` (RUNNERS=<its dist/>), one for each target, of the version of the `pencere` command.
-# When pencere has a release, `pencere build --target T` fetches them itself and --runner goes
-# away.
+# dist/release, with the SHA256SUMS that names them. `pencere build --target` fetches the runner of
+# each target from the release of the `pencere` command's own version and checks it against that
+# release's sums, so no target's toolchain is needed here. The release workflow runs it.
 TARGETS = aarch64-apple-darwin aarch64-unknown-linux-musl x86_64-unknown-linux-musl
-RUNNERS ?= ../pencere/dist
 PACKAGE_VERSION = $(shell node tools/release.mjs version)
-RUNNER_VERSION = $(shell "$(PENCERE)" --version | sed 's/^pencere //')
 
 dist:
 	@test -x "$(PENCERE)" || { echo "dist: the pencere command is not at $(PENCERE): see PENCERE at the top of the Makefile"; exit 1; }
 	rm -rf dist/release
 	mkdir -p dist/release
 	@for target in $(TARGETS); do \
-		runner="$(RUNNERS)/pencere-$(RUNNER_VERSION)-$$target"; \
-		test -f "$$runner" || { echo "dist: no runner for $$target at $$runner: make dist in a pencere checkout, then make dist RUNNERS=<its dist/>"; exit 1; }; \
-		"$(PENCERE)" build --name dockerpen --target $$target --runner "$$runner" -o dist/release/dockerpen-$(PACKAGE_VERSION)-$$target || exit 1; \
+		"$(PENCERE)" build --name dockerpen --target $$target -o dist/release/dockerpen-$(PACKAGE_VERSION)-$$target || exit 1; \
 	done
-	cd dist/release && shasum -a 256 dockerpen-* > SHA256SUMS
+	cd dist/release && { sha256sum dockerpen-* 2>/dev/null || shasum -a 256 dockerpen-*; } > SHA256SUMS
 	@cat dist/release/SHA256SUMS
+	node tools/release.mjs dist dist/release
 
 # release-prepare sets the version and dates the changelog's Unreleased section.
 release-prepare:
 	@test -n "$(VERSION)" || { echo "usage: make release-prepare VERSION=<x.y.z>"; exit 2; }
 	node tools/release.mjs prepare $(VERSION)
 
-# release runs the gate and the release checks (dist/release holds the three files of this
-# version, made after the release commit), then tags. Nothing is pushed.
-release: check
-	node tools/release.mjs tag
-
-# publish pushes main and the tag, then makes the GitHub release with the three files and
-# SHA256SUMS. Publishing: run on the maintainer's word.
-publish:
-	node tools/release.mjs publish
+# rehearse runs the checks of a release of the prepared version, on any branch. It changes nothing:
+# a release is the commit of release-prepare pushed to main, which the release workflow tags,
+# builds and drafts once the gate is green, and publishes when a maintainer approves (RELEASING.md).
+rehearse:
+	node tools/release.mjs rehearse
