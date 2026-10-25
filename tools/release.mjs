@@ -397,7 +397,40 @@ function draft(dir) {
  * sums, and the attestation that this repository's release workflow built each. What the workflow
  * does once a maintainer has approved it.
  */
+/**
+ * The environment the workflow publishes in (`RELEASE_ENVIRONMENT`, "release") must have someone
+ * who approves: GitHub makes an environment a job names and that is not there, with no rule, and
+ * runs the job at once, so a release would be public with nobody's word (as 0.3.0 was). A run
+ * outside the workflow (no `RELEASE_ENVIRONMENT`) is not asked.
+ */
+function requireReviewers() {
+  const environment = process.env.RELEASE_ENVIRONMENT;
+  if (environment === undefined || environment === "") return;
+  const repo =
+    process.env.GITHUB_REPOSITORY ||
+    run("gh", ["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]);
+  let rules;
+  try {
+    rules = JSON.parse(
+      run("gh", ["api", `repos/${repo}/environments/${environment}`]),
+    ).protection_rules;
+  } catch (error) {
+    refuse(
+      `cannot ask GitHub about the environment ${environment}: ${String(error.stderr ?? error.message).trim()}`,
+    );
+  }
+  const reviewers = (rules ?? [])
+    .filter((rule) => rule.type === "required_reviewers")
+    .flatMap((rule) => rule.reviewers ?? []);
+  if (reviewers.length === 0) {
+    refuse(
+      `the environment ${environment} has no required reviewers, so nobody approved this: add them in the repository's Settings, Environments, ${environment}, then run the workflow again (RELEASING.md)`,
+    );
+  }
+}
+
 function publish() {
+  requireReviewers();
   const version = versionOf();
   const tagName = tagOf(version);
   if (!tagExists(tagName)) refuse(`no tag ${tagName}: the workflow tags before it publishes`);

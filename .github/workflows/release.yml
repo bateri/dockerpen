@@ -8,8 +8,9 @@
 #   runner. They are summed, checked and attested (provenance).
 # - draft: the tag `v<version>` and the GitHub release as a draft, with the changelog section as its
 #   notes and the files.
-# - publish: waits in the `release` environment for a maintainer to approve it, checks the draft's
-#   files against their sums and attestations, and makes it public as the Latest.
+# - publish: waits in the `release` environment for a maintainer to approve it, refuses an
+#   environment with no required reviewers, checks the draft's files against their sums and
+#   attestations, and makes it public as the Latest.
 #
 # Started by hand on main, it finishes a release that stopped half way (tagged on this commit, not
 # yet public), if the gate is green on it. With `rehearse` it only builds, on any branch, and keeps
@@ -155,6 +156,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     permissions:
+      actions: read
       contents: write
       attestations: read
     steps:
@@ -167,4 +169,5 @@ jobs:
           node-version: 22
       - env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_ENVIRONMENT: release
         run: node tools/release.mjs publish

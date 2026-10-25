@@ -96,6 +96,10 @@ at the release.
 GitHub, the repository's **Settings → Environments**: an environment named `release`, with
 **Required reviewers** (the maintainers who approve a release) and, under **Deployment branches and
 tags**, `main` alone. No secret and no token: the workflow publishes with the repository's own.
+GitHub makes an environment a job names that is not there, with no rule, and runs the job at once
+(0.3.0 was published so, before the environment was set up); so the publishing job first asks
+GitHub for the environment's rules and stops, publishing nothing, where it has no required
+reviewers.
 
 ## Who releases
 
