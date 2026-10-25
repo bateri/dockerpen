@@ -1,14 +1,15 @@
-// Draws dockerpen's icon, its mark (the Mark in src/view/components/Screens.tsx: three
-// containers stacked, the middle one lifted), as PNGs in data: URIs, and writes them to
-// src/server/icon.ts. A terminal draws a program's icon only from the bytes it is given, so
-// the server carries them; run this again after changing the shapes here and there.
+// Draws dockerpen's icon, its mark (three containers stacked, the middle one lifted; the page
+// draws the same shapes from src/assets/mark.svg), as PNGs, and writes them to
+// src/assets/icon-<side>-<theme>.png. A terminal draws a program's icon only from the bytes it is
+// given, so the program carries them (src/program/app.lua names the files); run this again after
+// changing the shapes here and there.
 //
 //   node tools/icon.mjs
 //
 // It uses nothing but Node: the shapes are rounded rectangles, filled with coverage taken
 // from a grid of samples in each pixel, and the PNG is written by hand around zlib.
 
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { deflateSync, crc32 } from "node:zlib";
 
 /** The mark in its 24-unit box: x, y, width, height, corner radius, opacity. */
@@ -21,7 +22,7 @@ const MARK = [
 /** The part of that box an icon shows: the mark (x 3–21, y 2–20) with a unit around it. */
 const FRAME = { x: 2, y: 1, side: 20 };
 
-/** One colour for each ground, after MCP's `theme`: the ground the icon is made to stand on. */
+/** One colour for each ground, as an icon's `theme` says: the ground the icon is made to stand on. */
 const COLOURS = {
   dark: [0x6c, 0xa8, 0xf5],
   light: [0x1f, 0x5f, 0xc9],
@@ -87,31 +88,13 @@ function png(side, pixels) {
   ]);
 }
 
-const icons = [];
+const directory = new URL("../src/assets/", import.meta.url);
+mkdirSync(directory, { recursive: true });
+let written = 0;
 for (const [theme, colour] of Object.entries(COLOURS)) {
   for (const side of SIDES) {
-    const src = `data:image/png;base64,${draw(side, colour).toString("base64")}`;
-    icons.push(
-      `  {\n    src: "${src}",\n    mimeType: "image/png",\n    sizes: ["${side}x${side}"],\n    theme: "${theme}",\n  },`,
-    );
+    writeFileSync(new URL(`icon-${side}-${theme}.png`, directory), draw(side, colour));
+    written += 1;
   }
 }
-
-const path = new URL("../src/server/icon.ts", import.meta.url);
-writeFileSync(
-  path,
-  `// Written by tools/icon.mjs; change the shapes there and run it again.
-
-import type { Icon } from "@modelcontextprotocol/server";
-
-/**
- * dockerpen's icon, the mark its view shows, for a dark ground and a light one (MCP's \`theme\`),
- * 32 and 64 pixels a side, as PNGs in \`data:\` URIs: a terminal draws an icon only from the
- * bytes it is given, and never fetches one.
- */
-export const ICONS: Icon[] = [
-${icons.join("\n")}
-];
-`,
-);
-console.log(`wrote ${icons.length} icons to src/server/icon.ts`);
+console.log(`wrote ${written} icons to src/assets/`);

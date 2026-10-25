@@ -1,0 +1,167 @@
+#!/bin/sh
+# A stand-in for the docker command. It answers from the files beside it (fixtures/*), by what it
+# is asked, so that the tests of dockerpen's program run without an engine and without touching
+# anything of the machine's own Docker. Every command it is given is appended to $STANDIN_LOG, so
+# that a test can say what dockerpen ran.
+#
+#   STANDIN_MODE=down     every command fails as one with no engine to talk to does
+#   STANDIN_MODE=broken   every command fails with a plain error
+#   STANDIN_FAIL=<id>     an action on that container fails (the others do not)
+#   STANDIN_STATE=<dir>   where it counts how often a stream was started
+#   STANDIN_STATS=ends    the first `stats` ends after its lines, as an engine that is restarted does
+#   STANDIN_PULL=fail     `pull` fails
+#   STANDIN_FOLLOW=ends   `logs --follow` ends after the lines it has, as a log of a stopped container does
+here=$(cd "$(dirname "$0")/.." && pwd)
+[ -n "$STANDIN_LOG" ] && printf '%s\n' "$*" >> "$STANDIN_LOG"
+
+case "${STANDIN_MODE:-ok}" in
+down)
+	echo "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?" >&2
+	exit 1
+	;;
+broken)
+	echo "Error response from daemon: something is wrong in here" >&2
+	exit 1
+	;;
+esac
+
+# How many times this command has been started.
+started() {
+	[ -n "$STANDIN_STATE" ] || { echo 1; return; }
+	file="$STANDIN_STATE/$1"
+	n=$(cat "$file" 2>/dev/null || echo 0)
+	n=$((n + 1))
+	echo "$n" > "$file"
+	echo "$n"
+}
+
+case "$1" in
+ps)
+	cat "$here/ps.jsonl"
+	;;
+inspect)
+	for last; do :; done
+	case "$last" in
+	aaaa* | shop-api-1) cat "$here/inspect.json" ;;
+	*) echo "Error response from daemon: No such container: $last" >&2; exit 1 ;;
+	esac
+	;;
+top)
+	cat "$here/top.txt"
+	;;
+stats)
+	n=$(started stats)
+	cat "$here/stats.jsonl"
+	if [ "$STANDIN_STATS" = ends ] && [ "$n" = 1 ]; then
+		echo "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?" >&2
+		exit 1
+	fi
+	sleep 60
+	;;
+events)
+	started events > /dev/null
+	cat "$here/events.jsonl"
+	sleep 60
+	;;
+logs)
+	follow=no tail=all since=
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		--follow) follow=yes ;;
+		--tail) tail="$2"; shift ;;
+		--since) since="$2"; shift ;;
+		esac
+		shift
+	done
+	file="$here/logs.txt"
+	[ "$tail" = all ] || { tmp=$(mktemp); tail -n "$tail" "$file" > "$tmp"; file="$tmp"; }
+	while IFS=$(printf '\t') read -r stream line; do
+		if [ -n "$since" ]; then
+			time=${line%% *}
+			[ "$time" \< "$since" ] && continue
+		fi
+		if [ "$stream" = err ]; then printf '%s\n' "$line" >&2; else printf '%s\n' "$line"; fi
+	done < "$file"
+	[ "$follow" = yes ] && [ "$STANDIN_FOLLOW" != ends ] && sleep 60
+	;;
+start | stop | restart | pause | unpause | kill | rm)
+	command="$1"
+	shift
+	status=0
+	skip=no
+	for argument; do
+		if [ "$skip" = yes ]; then skip=no; continue; fi
+		case "$argument" in
+		--time) skip=yes ;;
+		-*) ;;
+		*)
+			if [ "$argument" = "$STANDIN_FAIL" ]; then
+				echo "Error response from daemon: cannot $command container: $argument: it is not possible just now" >&2
+				status=1
+			else
+				echo "$argument"
+			fi
+			;;
+		esac
+	done
+	exit $status
+	;;
+image)
+	case "$2" in
+	ls) cat "$here/images.jsonl" ;;
+	history) cat "$here/history.jsonl" ;;
+	rm) shift 2; for argument; do case "$argument" in -*) ;; *) echo "Untagged: $argument" ;; esac; done ;;
+	prune) echo "Total reclaimed space: 1.2MB" ;;
+	esac
+	;;
+volume)
+	case "$2" in
+	ls) cat "$here/volumes.jsonl" ;;
+	rm) echo "$3" ;;
+	prune) echo "Total reclaimed space: 237MB" ;;
+	esac
+	;;
+network)
+	case "$2" in
+	ls) cat "$here/networks.jsonl" ;;
+	inspect) cat "$here/network-inspect.json" ;;
+	rm) echo "$3" ;;
+	prune) echo "Deleted Networks:" ;;
+	esac
+	;;
+container)
+	echo "Total reclaimed space: 16.4kB"
+	;;
+builder)
+	echo "Total reclaimed space: 0B"
+	;;
+system)
+	if [ "$3" = "-v" ]; then cat "$here/df-v.json"; else cat "$here/df.jsonl"; fi
+	;;
+info)
+	cat "$here/info.json"
+	;;
+context)
+	echo "unix:///standin.sock"
+	;;
+exec)
+	echo "stand-in: in the container"
+	;;
+pull)
+	if [ "$STANDIN_PULL" = fail ]; then
+		echo "Error response from daemon: pull access denied for $2, repository does not exist" >&2
+		exit 1
+	fi
+	echo "Using default tag: latest"
+	echo "latest: Pulling from library/$2"
+	echo "aaa111: Pulling fs layer"
+	echo "bbb222: Pulling fs layer"
+	echo "aaa111: Pull complete"
+	echo "bbb222: Already exists"
+	echo "Status: Downloaded newer image for $2:latest"
+	;;
+*)
+	echo "stand-in docker: nothing is recorded for: $*" >&2
+	exit 2
+	;;
+esac

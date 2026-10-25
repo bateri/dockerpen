@@ -1,63 +1,14 @@
 {
   "name": "dockerpen",
-  "version": "0.2.1",
-  "description": "Docker, in the terminal pane: containers, logs, stats, images, volumes and networks as a real interface, over plain ssh",
+  "private": true,
+  "description": "Docker, in the terminal pane: containers, logs, stats, images, volumes and networks as a real interface. This manifest is for the tests and the release tools only; dockerpen itself is one native file with no Node in it.",
   "license": "GPL-3.0-or-later",
-  "keywords": [
-    "docker",
-    "terminal",
-    "mcp",
-    "mcp-apps",
-    "pencere",
-    "tui",
-    "containers"
-  ],
   "type": "module",
-  "bin": {
-    "dockerpen": "./dist/server/main.js"
-  },
-  "files": [
-    "dist",
-    "CHANGELOG.md",
-    "README.md",
-    "LICENSE"
-  ],
   "scripts": {
-    "build": "npm run build:view && npm run build:server",
-    "build:view": "vite build && vite build --mode single",
-    "build:server": "tsc -p tsconfig.server.json",
-    "harness": "npm run build:server && vite --mode harness",
-    "start": "node dist/server/main.js",
-    "dev": "node dist/server/main.js --dev",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
-    "prepack": "npm run build",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/"
   },
   "engines": {
     "node": ">=22.12"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^2.0.3",
-    "@modelcontextprotocol/server": "^2.3.1",
-    "@pencere/sdk": "^0.1.1",
-    "zod": "^4.6.7"
-  },
-  "devDependencies": {
-    "@modelcontextprotocol/client": "^2.3.1",
-    "@tanstack/react-virtual": "^3.14.21",
-    "@types/node": "^22.20.5",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^6.1.2",
-    "lucide-react": "^1.61.0",
-    "motion": "^14.5.0",
-    "prettier": "^3.9.10",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1",
-    "typescript": "^5.9.3",
-    "vite": "^8.3.5",
-    "vite-plugin-singlefile": "^2.3.4",
-    "zustand": "^5.0.15"
   },
   "repository": {
     "type": "git",

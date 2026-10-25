@@ -1,0 +1,48 @@
+[
+    {
+        "Name": "bridge",
+        "Id": "bridge0000000000000000000000000000000000000000000000000000000000",
+        "IPAM": {
+            "Config": [
+                {
+                    "Subnet": "172.17.0.0/16",
+                    "Gateway": "172.17.0.1"
+                }
+            ]
+        },
+        "Containers": {
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff": {
+                "Name": "toolbox",
+                "IPv4Address": "172.17.0.2/16"
+            }
+        }
+    },
+    {
+        "Name": "shop_default",
+        "Id": "shopnet111111111111111111111111111111111111111111111111111111111",
+        "IPAM": {
+            "Config": [
+                {
+                    "Subnet": "172.18.0.0/16",
+                    "Gateway": "172.18.0.1"
+                }
+            ]
+        },
+        "Containers": {
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {
+                "Name": "shop-api-1"
+            },
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {
+                "Name": "shop-web-1"
+            }
+        }
+    },
+    {
+        "Name": "host",
+        "Id": "host000000000000000000000000000000000000000000000000000000000000",
+        "IPAM": {
+            "Config": []
+        },
+        "Containers": {}
+    }
+]

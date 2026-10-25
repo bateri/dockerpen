@@ -1,0 +1,5 @@
+{"BlockIO":"0B / 0B","CPUPerc":"12.50%","Container":"shop-api-1","ID":"aaaaaaaaaaaa","MemPerc":"0.40%","MemUsage":"48.2MiB / 512MiB","Name":"shop-api-1","NetIO":"1.5kB / 2.1kB","PIDs":"11"}
+
+{"BlockIO":"6.49MB / 0B","CPUPerc":"0.10%","Container":"shop-web-1","ID":"bbbbbbbbbbbb","MemPerc":"0.40%","MemUsage":"6.1MiB / 11.73GiB","Name":"shop-web-1","NetIO":"1.13kB / 126B","PIDs":"3"}
+
+{"BlockIO":"1.2GB / 301MB","CPUPerc":"200.00%","Container":"shop-db-1","ID":"cccccccccccc","MemPerc":"0.40%","MemUsage":"1.1GiB / 11.73GiB","Name":"shop-db-1","NetIO":"12MB / 3.4MB","PIDs":"27"}

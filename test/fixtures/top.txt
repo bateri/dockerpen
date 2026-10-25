@@ -1,0 +1,3 @@
+PID                 USER                TIME                COMMAND
+4242                node                0:01                node server.js
+4310                node                0:00                sh -c wget -q -O /dev/null http://localhost:3000/healthz
