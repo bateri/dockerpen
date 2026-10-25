@@ -58,7 +58,7 @@ local function option_row(d, index, option)
 	local on = d.values[option.key]
 	local id = "dialog:option:" .. index
 	local row = b.div():row():items_start():gap(10):px(10):py(9):rounded(8):press(id):no_shrink()
-	row:bg(hovered(id) and "raised3" or "raised1")
+	row:bg(hovered(id) and "raised2" or "raised1")
 	if d.cursor == index and #d.options > 1 then
 		row:border(1, alpha("accent", 0.5))
 	end
@@ -79,8 +79,10 @@ end
 function overlays.dialog()
 	local d = S.dialog
 	local wide = d.kind == "prune"
-	local card = card_of(math.min(wide and 620 or 440, S.width - 32))
+	local card_w = math.min(wide and 620 or 440, S.width - 32)
+	local card = card_of(card_w)
 	local head = b.div():row():gap(12):items_start()
+	local text_w = card_w - 36 - ((d.danger or d.kind == "prune") and 42 or 0)
 	if d.danger then
 		head:child(mark_box("triangle-alert", "error"))
 	elseif d.kind == "prune" then
@@ -93,7 +95,7 @@ function overlays.dialog()
 			:grow(1)
 			:min_w(0)
 			:child(T(d.title, "foreground", 14, 650):truncate())
-			:child(T(d.body, "dim", SIZE.body):truncate():max_w(wide and 540 or 360))
+			:child(P.paragraph(d.body or "", text_w, "dim", SIZE.body))
 	)
 	card:child(head)
 	if d.kind == "pull" then
@@ -126,7 +128,7 @@ function overlays.dialog()
 					:px(8)
 					:rounded(11)
 					:press(id)
-					:bg(name == text and alpha("accent", 0.2) or (hovered(id) and "raised4" or "raised3"))
+					:bg(name == text and alpha("accent", 0.2) or (hovered(id) and "raised3" or "raised2"))
 					:child(T(name, (name == text or hovered(id)) and "foreground" or "dim", SIZE.small))
 			)
 		end
@@ -233,7 +235,8 @@ local function keys_cell(keys)
 end
 
 function overlays.help()
-	local card = card_of(math.min(620, S.width - 32))
+	local card_w = math.min(620, S.width - 32)
+	local card = card_of(card_w)
 	card:child(
 		b.div()
 			:row()
@@ -242,15 +245,18 @@ function overlays.help()
 			:child(P.button("help:close", nil, { variant = "ghost", size = "sm", icon = "x", icon_size = 14 }))
 	)
 	card:child(
-		T(
+		P.paragraph(
 			"Everything the mouse does, the keys do too. A key acts on the marked containers, or on the chosen one.",
+			card_w - 36,
 			"dim",
 			SIZE.body
-		):truncate()
+		)
 	)
-	local grid = b.div():grid({ b.fr(1), b.fr(1) }):gap_x(24):gap_y(2):pr(4)
+	-- Two columns of at least 230 where there is room for them, else one (the grid's own 4 at the end).
+	local tracks = card_w - 40 >= 484 and { b.fr(1), b.fr(1) } or { b.fr(1) }
+	local grid = b.div():grid(tracks):gap_x(24):gap_y(2):pr(4)
 	for _, part in ipairs(HELP) do
-		grid:child(b.div():span(2):pt(10):pb(2):child(T(string.upper(part[1]), "quiet", SIZE.tiny + 0.5, 500)))
+		grid:child(b.div():span(#tracks):pt(10):pb(2):child(T(string.upper(part[1]), "quiet", SIZE.tiny + 0.5)))
 		for _, row in ipairs(part[2]) do
 			grid:child(
 				b.div()
@@ -272,7 +278,7 @@ function overlays.help()
 			:scroll_y(ui:scroll_offset("help.scroll"))
 			:child(grid)
 	)
-	return over(card, "help:backdrop")
+	return over(card, "help:backdrop", math.min(math.floor(S.height * 0.12), 80))
 end
 
 -- What was said for a moment, at the end of the page.
@@ -286,8 +292,12 @@ function overlays.toasts()
 		:items_stretch()
 	local marks = { success = "circle-check", error = "circle-alert", warning = "triangle-alert", info = "info" }
 	local roles = { success = "success", error = "error", warning = "warning", info = "info" }
+	local toast_w = math.min(340, S.width - 24)
 	for index, item in ipairs(S.toasts) do
 		local id = "toast:" .. index
+		-- The room the words have: the toast less its padding, the mark, the gaps and the buttons.
+		local actions_w = 24 + (item.action and (#item.action.label * 7.2 + 16 + 2) or 0)
+		local words_w = math.max(toast_w - 12 - 8 - 15 - 20 - actions_w, 60)
 		local role = roles[item.kind] or "info"
 		local el = b.div()
 			:press(id)
@@ -303,9 +313,9 @@ function overlays.toasts()
 			:shadow(0, 6, 18, alpha("shadow", 0.5))
 		el:child(b.div():pt(1):child(P.icon(marks[item.kind] or "info", 15, role)))
 		local text = b.div():col():gap(2):grow(1):min_w(0)
-		text:child(T(item.text, "foreground", SIZE.body, 600):truncate())
+		text:child(P.paragraph(item.text or "", words_w, "foreground", SIZE.body, 600, 3))
 		if item.body then
-			text:child(T(item.body, "dim", SIZE.small + 0.5):truncate())
+			text:child(P.paragraph(item.body, words_w, "dim", SIZE.small + 0.5, nil, 4))
 		end
 		el:child(text)
 		local actions = b.div():row():items_center():gap(2):mt(-3):no_shrink()
@@ -314,7 +324,7 @@ function overlays.toasts()
 				P.button(
 					"toast.action:" .. index,
 					item.action.label,
-					{ variant = "ghost", size = "sm", disabled = false }
+					{ variant = "ghost", size = "sm", ink = "accent" }
 				)
 			)
 		end

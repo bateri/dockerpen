@@ -127,7 +127,7 @@ local function hint(entry, id)
 	if over then
 		el:bg(alpha("foreground", 0.06))
 	end
-	el:child(P.kbd(entry.keys, SIZE.tiny))
+	el:child(P.kbd(entry.keys, SIZE.tiny, 16))
 	if entry.label ~= "" then
 		el:child(T(entry.label, over and "foreground" or "quiet", SIZE.small))
 	end
@@ -137,7 +137,7 @@ end
 function status.bar(width)
 	S.hint_runs = {}
 	local row = b.div():row():items_center():gap(10):h(SIZE.status):px(8):clip():bg("raised1")
-	local keys = b.div():row():items_center():gap(10):min_w(0):clip()
+	local keys = b.div():row():items_center():gap(4):min_w(0):clip()
 	local room = math.max(math.floor((width - 260) / 90), 2)
 	for index, entry in ipairs(hints()) do
 		if index > room then
@@ -151,6 +151,8 @@ function status.bar(width)
 		keys:child(hint(entry, id))
 	end
 	row:child(keys):child(b.spacer())
+	-- The jobs, the palette, the help and the engine, closer to each other than the keys are.
+	local right = b.div():row():items_center():gap(8):no_shrink()
 	if #S.jobs > 0 then
 		local running = 0
 		for _, job in ipairs(S.jobs) do
@@ -159,7 +161,7 @@ function status.bar(width)
 			end
 		end
 		local ink = running > 0 and "accent" or "quiet"
-		row:child(
+		right:child(
 			b.div()
 				:row()
 				:items_center()
@@ -174,16 +176,13 @@ function status.bar(width)
 				:child(T(running > 0 and (running .. " running") or (#S.jobs .. " done"), ink, SIZE.small))
 		)
 	end
-	row:child(hint({ keys = ":", label = "commands" }, "cmd"))
-	row:child(hint({ keys = "?", label = "" }, "helpbtn"))
-	row:child(
-		b.div()
-			:row()
-			:items_center()
-			:px(4)
-			:no_shrink()
-			:child(P.disc(S.engine and not S.failure and "success" or "error", 7))
-	)
+	right:child(hint({ keys = ":", label = "commands" }, "cmd"))
+	right:child(hint({ keys = "?", label = "" }, "helpbtn"))
+	right:child(b.div():row():items_center():px(4):no_shrink():child(
+		-- A disc in a halo where the engine answers; a ring where it does not (red where it failed).
+		(S.engine and not S.failure) and P.halo("success", 7) or P.disc(S.failure and "error" or "quiet", 7, false)
+	))
+	row:child(right)
 	return b.div():col():no_shrink():child(b.div():h(1):bg(alpha("border", 0.6))):child(row)
 end
 

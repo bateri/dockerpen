@@ -62,7 +62,7 @@ local function head_cell(label, how, align)
 	if how then
 		cell:press("sorth:" .. how)
 	end
-	cell:child(T(label, (active or over) and "dim" or "quiet", SIZE.tiny + 0.5, 500):truncate())
+	cell:child(T(label, (active or over) and "dim" or "quiet", SIZE.tiny + 0.5):truncate())
 	if active then
 		cell:child(P.icon("chevron-down", 11, "dim"))
 	end
@@ -83,7 +83,7 @@ local function header_row(l)
 	if l.ports then
 		row:child(head_cell("PORTS"))
 	end
-	row:child(head_cell("STATUS", "state", "end"))
+	row:child(head_cell("STATUS", "state"))
 	return b.div():col():no_shrink():child(row):child(b.div():h(1):bg(alpha("border", 0.6)))
 end
 
@@ -117,14 +117,12 @@ local function name_tag(c)
 end
 
 local function cpu_cell(c, sample, series)
-	local cell = b.div():row():items_center():justify_end():gap(8):min_w(0)
+	local cell = b.div():row():items_center():justify_end():gap(6):min_w(0)
 	if sample and c.state == "running" then
 		cell:child(b.div():w(44):h(14):no_shrink():child(P.spark(series and series.cpu or {}, "accent")))
-		cell:child(
-			b.div():w(42):no_shrink():child(T(fmt.percent(sample.cpu), "foreground", SIZE.small + 1):align("end"))
-		)
+		cell:child(b.div():w(42):no_shrink():child(T(fmt.percent(sample.cpu), "dim", SIZE.small + 0.5):align("end")))
 	else
-		cell:child(T("–", "quiet", SIZE.small + 1))
+		cell:child(T("–", "quiet", SIZE.small + 0.5))
 	end
 	return cell
 end
@@ -139,7 +137,7 @@ local function memory_peak()
 end
 
 local function memory_cell(c, sample, peak)
-	local cell = b.div():row():items_center():justify_end():gap(8):min_w(0)
+	local cell = b.div():row():items_center():justify_end():gap(6):min_w(0)
 	if sample and c.state == "running" then
 		-- A container with a limit of its own is measured against it; the rest against each other.
 		local host = S.engine and S.engine.memory or 0
@@ -148,17 +146,19 @@ local function memory_cell(c, sample, peak)
 		local share = limited and sample.memory / limit or sample.memory / peak
 		local role = "quiet"
 		if limited then
-			role = share > 0.85 and "error" or (share > 0.65 and "warning" or "quiet")
+			role = share > 0.85 and "error" or (share > 0.65 and "warning" or "accent")
 		end
 		cell:child(P.meter(share, role))
 		cell:child(
 			b.div()
-				:w(54)
+				:min_w(42)
 				:no_shrink()
-				:child(T(fmt.memory_tight(sample.memory), "foreground", SIZE.small + 1):align("end"))
+				:row()
+				:justify_end()
+				:child(T(fmt.memory_tight(sample.memory), "dim", SIZE.small + 0.5))
 		)
 	else
-		cell:child(T("–", "quiet", SIZE.small + 1))
+		cell:child(T("–", "quiet", SIZE.small + 0.5))
 	end
 	return cell
 end
@@ -241,7 +241,7 @@ local function container_row(row, l, peak)
 			:truncate()
 			:min_w(0)
 	)
-	if not row.grouped and c.project then
+	if l.tags and not row.grouped and c.project then
 		name:child(P.tag(c.project))
 	end
 	if l.tags then
@@ -252,7 +252,7 @@ local function container_row(row, l, peak)
 	end
 	el:child(name)
 	if l.image then
-		el:child(P.line(fmt.image_name(c.image), "dim", SIZE.small + 1))
+		el:child(P.line(fmt.image_name(c.image), "dim", SIZE.body))
 	end
 	el:child(cpu_cell(c, sample, series))
 	if l.memory then
@@ -264,9 +264,8 @@ local function container_row(row, l, peak)
 	if cursor or over then
 		el:child(row_verbs(c, up))
 	else
-		el:child(
-			b.div():row():justify_end():min_w(0):child(P.line(fmt.status(c.status), "dim", SIZE.small + 1):align("end"))
-		)
+		local words = c.state == "created" and "created" or fmt.status(c.status)
+		el:child(b.div():row():justify_end():min_w(0):child(P.line(words, "dim", SIZE.small + 0.5):align("end")))
 	end
 	return el
 end
@@ -291,7 +290,7 @@ local function group_row(group, first)
 			:justify_center()
 			:child(P.icon(group.folded and "chevron-right" or "chevron-down", 14, "dim"))
 	)
-	el:child(T(group.name, "foreground", SIZE.title, 650):no_shrink())
+	el:child(T(group.name, "foreground", SIZE.body, 650):no_shrink())
 	el:child(P.stack(group.members, function(c)
 		if has_issue(c) then
 			return "error"
@@ -324,7 +323,7 @@ local function group_row(group, first)
 end
 
 -- Why there is nothing to list.
-local function nothing_listed(rows_shown)
+local function nothing_listed(width)
 	if S.failure and #S.containers == 0 then
 		local hint = S.failure.code == "docker-missing"
 				and "dockerpen runs the docker command. Install Docker, or put docker on the PATH."
@@ -332,38 +331,47 @@ local function nothing_listed(rows_shown)
 		return P.nothing(
 			S.failure.code == "docker-missing" and "There is no docker command" or "Docker is not reachable",
 			hint,
-			"plug-zap"
-		):child(T(S.failure.message, "quiet", SIZE.small):truncate():max_w(560):mt(6))
+			"plug-zap",
+			width
+		):child(T(S.failure.message, "quiet", SIZE.small):truncate():max_w(math.min(560, width - 40)):mt(6))
 	end
 	if #S.containers == 0 then
 		if not S.known then
-			return P.nothing("Looking for containers…")
+			return P.nothing("Looking for containers…", nil, nil, width)
 		end
 		return P.nothing(
 			"There are no containers",
 			"Start one with docker run, or docker compose up, and it shows here.",
-			"boxes"
+			"boxes",
+			width
 		)
 	end
 	if S.query ~= "" then
 		return P.nothing(
 			"No container matches “" .. S.query .. "”",
 			"Change the filter, or select what is in the field and type another.",
-			"search-x"
+			"search-x",
+			width
 		)
 	end
-	return P.nothing("No " .. string.lower(S.filter) .. " containers", "Press f to look at another kind.", "boxes")
+	return P.nothing(
+		"No " .. string.lower(S.filter) .. " containers",
+		"Press f to look at another kind.",
+		"boxes",
+		width
+	)
 end
 
 -- The list of containers: the title, the bar, the heads of the columns, the rows.
 function screens.list(width)
-	local rows, shown = container_rows()
-	local l = layout(width)
+	local rows = container_rows()
+	-- The room of the rows, less the sides of the list.
+	local l = layout(width - 16)
 	local count = counts()
 	local col = b.div():col():grow(1):min_w(0):min_h(0)
 	col:child(P.title("Containers", count.running .. " running · " .. count.all .. " total", {
-		parts_toolbar.verb("act:pull", "Pull", "download", width),
-		parts_toolbar.verb("act:clean", "Clean up", "sparkles", width),
+		parts_toolbar.verb("act:pull", "Pull", "download"),
+		parts_toolbar.verb("act:clean", "Clean up", "sparkles"),
 	}))
 	col:child(parts_toolbar.containers(width))
 	if S.failure and #S.containers > 0 then
@@ -378,7 +386,7 @@ function screens.list(width)
 		)
 	end
 	if #rows == 0 then
-		col:child(nothing_listed(shown))
+		col:child(nothing_listed(width))
 		return col
 	end
 	col:child(header_row(l))

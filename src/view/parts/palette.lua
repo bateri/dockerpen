@@ -65,6 +65,9 @@ function part.view()
 	local p = S.palette
 	local list = palette.shown()
 	local width = math.min(560, S.width - 24)
+	local top = math.min(math.floor(S.height * 0.12), 80)
+	-- The list is as tall as it may be in the pane: the field (46 and its line), the foot (34), a margin.
+	local most = math.max(math.min(LIST_MOST, S.height - top - 47 - 34 - 12), ITEM + 12)
 	local box = b.div()
 		:col()
 		:w(width)
@@ -88,12 +91,8 @@ function part.view()
 	)
 	box:child(b.div():h(1):bg(alpha("border", 0.5)):no_shrink())
 	local tops, total = layout_of(list)
-	local scroll = b.div()
-		:col()
-		:id("palette.list")
-		:h(math.min(total + 12, LIST_MOST))
-		:scroll_y(ui:scroll_offset("palette.list"))
-		:p(6)
+	local scroll =
+		b.div():col():id("palette.list"):h(math.min(total + 12, most)):scroll_y(ui:scroll_offset("palette.list")):p(6)
 	if #list == 0 then
 		scroll:child(b.div():col():items_center():pt(22):pb(22):child(T("Nothing is called that.", "dim", SIZE.body)))
 	end
@@ -133,7 +132,7 @@ function part.view()
 	-- Keeps the entry the keys are on in view.
 	if p.reveal then
 		p.reveal = false
-		local view = math.min(total + 12, LIST_MOST) - 12
+		local view = math.min(total + 12, most) - 12
 		local top = tops[p.active] or 0
 		local offset = ui:scroll_offset("palette.list")
 		if top - GROUP < offset then
@@ -143,7 +142,8 @@ function part.view()
 		end
 	end
 	box:child(scroll)
-	local foot = b.div():row():items_center():gap(14):px(14):py(8):no_shrink():bg(alpha("foreground", 0.02))
+	box:child(b.div():h(1):bg(alpha("border", 0.5)):no_shrink())
+	local foot = b.div():row():items_center():gap(14):px(14):py(8):no_shrink()
 	local function hint(keys, label)
 		local row = b.div():row():items_center():gap(5)
 		for _, key in ipairs(keys) do
@@ -160,7 +160,7 @@ function part.view()
 		:inset(0, 0, 0, 0)
 		:col()
 		:items_center()
-		:pt(math.min(math.floor(S.height * 0.12), 80))
+		:pt(top)
 		:bg(alpha("background", 0.62))
 		:press("palette:backdrop")
 		:child(box)

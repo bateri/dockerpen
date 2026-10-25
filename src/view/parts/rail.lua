@@ -42,13 +42,14 @@ end
 
 -- What stands at the end of a section's row: the containers with something to look at, news in the
 -- activity, a job running, how many there are, or the key that goes to it.
-local function trailing(section, rail_hovered)
+local function trailing(section, rail_hovered, active)
+	local count_role = active and "dim" or "quiet"
 	if section.id == "containers" then
 		local issues = counts().issues
 		if issues > 0 then
 			return P.badge(issues)
 		end
-		return T(tostring(#S.containers), "quiet", SIZE.small)
+		return T(tostring(#S.containers), count_role, SIZE.small)
 	elseif section.id == "activity" then
 		local news = fresh_news()
 		if news > 0 then
@@ -61,7 +62,7 @@ local function trailing(section, rail_hovered)
 			end
 		end
 	elseif S.lists[section.id] then
-		return T(tostring(#S.lists[section.id]), "quiet", SIZE.small)
+		return T(tostring(#S.lists[section.id]), count_role, SIZE.small)
 	end
 	if rail_hovered then
 		return T(section.key, "quiet", SIZE.tiny + 0.5)
@@ -84,9 +85,9 @@ local function item(section, compact, rail_hovered)
 		el:bg(alpha("foreground", 0.06))
 	end
 	el:child(icon(section.icon, 15, (active or hovered(id)) and "foreground" or "dim"))
-	local end_of = trailing(section, rail_hovered)
+	local end_of = trailing(section, rail_hovered, active)
 	if compact then
-		if end_of and (section.id == "containers" or section.id == "activity") and S.section ~= section.id then
+		if end_of and (section.id == "containers" or section.id == "activity") then
 			-- A dot at the corner says there is news.
 			local news = (section.id == "containers" and counts().issues > 0)
 				or (section.id == "activity" and fresh_news() > 0)
@@ -139,7 +140,7 @@ local function engine_card()
 	local card =
 		b.div():col():gap(6):p(8):rounded(8):bg(alpha("background", 0.55)):border(1, alpha("border", 0.6)):no_shrink()
 	card:child(
-		b.div():row():items_center():gap(7):child(P.disc("success", 7)):child(P.line(engine.name, "dim", SIZE.small))
+		b.div():row():items_center():gap(7):child(P.halo("success", 7)):child(P.line(engine.name, "dim", SIZE.small))
 	)
 	card:child(meter("cpu", cpu, "accent", nil, fmt.percent(latest and latest.cpu or 0, 0)))
 	card:child(
@@ -151,9 +152,12 @@ local function engine_card()
 			fmt.memory_tight(latest and latest.memory or 0)
 		)
 	)
+	-- In the card's room (the rail, less its sides and the card's), on as many lines as it takes, as
+	-- the first dockerpen's line wrapped: a line of the kit is one line, and would run past the card.
 	card:child(
-		T(
+		P.paragraph(
 			running .. " running · " .. engine.cpus .. " cpu · " .. fmt.memory_tight(engine.memory),
+			SIZE.rail - 2 * 8 - 2 * 8 - 2,
 			"quiet",
 			SIZE.tiny + 0.5
 		)

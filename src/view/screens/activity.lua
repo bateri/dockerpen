@@ -116,14 +116,20 @@ function screens.activity(width)
 			{ id = kind.id, label = kind.label, count = kind.id == "problems" and problems or nil, tone = kind.tone }
 	end
 	col:child(
-		parts_toolbar.plain(width, { prefix = "pf:", options = options, current = S.plain_filter.activity or "all" })
+		parts_toolbar.plain(
+			width,
+			{ prefix = "pf:", options = options, current = S.plain_filter.activity or "all" },
+			nil,
+			"Filter activity"
+		)
 	)
 	if #rows == 0 then
 		return col:child(
 			P.nothing(
 				"Quiet",
 				"Nothing happened since dockerpen looked. Start or stop something and it shows up here as it happens.",
-				"activity"
+				"activity",
+				width
 			)
 		)
 	end
@@ -142,24 +148,24 @@ function screens.activity(width)
 		elseif over then
 			el:bg(alpha("foreground", 0.06))
 		end
-		el:child(b.div():w(64):no_shrink():child(T(item.clock or "", "quiet", SIZE.small + 0.5)))
-		local chip = b.div():size(22, 22):rounded(6):row():items_center():justify_center():no_shrink()
+		el:child(b.div():w(70):no_shrink():child(T(item.clock or "", "quiet", SIZE.small + 0.5)))
+		local chip = b.div():size(22, 22):rounded(7):row():items_center():justify_center():no_shrink()
 		chip:bg(alpha(tone or "foreground", tone and 0.14 or 0.07))
 		chip:child(P.icon(mark, 13, tone or "dim"))
 		el:child(chip)
 		el:child(b.div():grow(1):min_w(0):child(P.line(text, "foreground", SIZE.body)))
-		if exists and (cursor or over) then
+		if exists then
 			el:child(P.button("ev:open:" .. row.id, "Open", { variant = "ghost", size = "sm" }))
 		end
 		local previous = rows[index - 1]
 		if previous == nil or previous.item.day ~= item.day then
+			-- The day as the original wrote it: "Monday, Oct 5", in capitals.
+			local day = string.upper((string.gsub(item.day or "", " 0(%d)", " %1")))
 			return b.div()
 				:col()
 				:h(SIZE.row + 30)
 				:no_shrink()
-				:child(
-					b.div():row():items_end():h(30):px(8):pb(4):child(T(item.day or "", "quiet", SIZE.small + 0.5, 600))
-				)
+				:child(b.div():row():items_end():h(30):px(8):pb(4):child(T(day, "quiet", SIZE.tiny + 0.5)))
 				:child(el)
 		end
 		return el

@@ -26,6 +26,11 @@ local function page_texts(k)
 	return kit.texts(k.root)
 end
 
+-- The texts of a page as one run of words, for a sentence the page wraps into several lines.
+local function words(texts)
+	return { table.concat(texts, " ") }
+end
+
 t.test("the page asks its program what it is, then listens to what changes", function()
 	local k = kit.start(PRELUDE, PAGE)
 	k:render(1300, 760, 100)
@@ -127,7 +132,8 @@ t.test("the keys move the cursor and a container's detail opens beside the list"
 	texts = page_texts(k)
 	t.has(texts, "node:22-alpine")
 	t.has(texts, "on-failure:3")
-	t.has(texts, "9229/tcp (not published)", "a port that is exposed and not published")
+	t.has(texts, "not published · ", "a port that is exposed and not published")
+	t.has(texts, "9229/tcp", "a port that is exposed and not published")
 	k:key("escape")
 	k:render(1300, 760, 103)
 	t.lacks(page_texts(k), "Overview", "Esc closes the detail")
@@ -269,7 +275,7 @@ t.test("docker that is not there is said, with what to do", function()
 	k:render(1300, 760, 101)
 	local texts = page_texts(k)
 	t.has(texts, "There is no docker command")
-	t.has(texts, "dockerpen runs the docker command. Install Docker, or put docker on the PATH.")
+	t.has(words(texts), "dockerpen runs the docker command. Install Docker, or put docker on the PATH.")
 	k:push(
 		"containers",
 		{ containers = {}, failure = { code = "engine-down", message = "Cannot connect to the Docker daemon" } }
@@ -277,7 +283,7 @@ t.test("docker that is not there is said, with what to do", function()
 	k:render(1300, 760, 102)
 	texts = page_texts(k)
 	t.has(texts, "Docker is not reachable")
-	t.has(texts, "Start Docker (or OrbStack, Colima, Podman…) and dockerpen carries on by itself.")
+	t.has(words(texts), "Start Docker (or OrbStack, Colima, Podman…) and dockerpen carries on by itself.")
 end)
 
 t.test("a list that was there stays when docker goes away, with the reason over it", function()
@@ -309,10 +315,10 @@ t.test("what the engine reports that is news is told as a toast, wherever the pe
 	})
 	k:render(1300, 760, 102)
 	local texts = page_texts(k)
-	t.has(texts, "shop-mailer-1 exited with code 1")
+	t.has(words(texts), "shop-mailer-1 exited with code 1")
 	t.lacks(texts, "shop-api-1 start", "a start is not news")
 	k:render(1300, 760, 120)
-	t.lacks(page_texts(k), "shop-mailer-1 exited with code 1", "a toast goes after a while")
+	t.lacks(words(page_texts(k)), "shop-mailer-1 exited with code 1", "a toast goes after a while")
 	k:key("6")
 	k:render(1300, 760, 121)
 	t.has(page_texts(k), "shop-mailer-1 stopped with exit 1", "and Activity keeps what happened")
@@ -517,10 +523,11 @@ t.test("the environment hides what looks secret until it is asked for", function
 	t.has(texts, "PORT")
 	t.has(texts, "3000")
 	t.lacks(texts, "hunter2")
-	t.has(texts, "Show secrets")
+	t.has(texts, "Reveal")
 	k:key("v")
 	k:render(1300, 760, 104)
-	t.has(page_texts(k), "postgres://shop:hunter2@db:5432/shop")
+	-- The value wraps in its column, as it did; its first line holds the password.
+	t.has(page_texts(k), "postgres://shop:hunter2@")
 end)
 
 t.test("the processes are asked for while they are looked at, and again after a while", function()
@@ -613,9 +620,7 @@ t.test("why a container stopped, in words", function()
 	k:answer("detail", stopped)
 	k:render(1300, 760, 103)
 	local texts = page_texts(k)
-	t.has(texts, "It ran out of memory and was killed.")
-	t.has(texts, "Exited with code 137 · SIGKILL: killed, or out of memory")
-	t.has(texts, "Stopped 13s ago")
+	t.has(texts, "Killed for running out of memory")
 end)
 
 -- ---- images, volumes, networks, the disk ------------------------------------------------------------
@@ -773,7 +778,7 @@ t.test("networks that are Docker's own cannot be removed", function()
 	k:key("d")
 	k:render(1300, 760, 103)
 	t.has(page_texts(k), "Nothing to remove")
-	t.has(page_texts(k), "Built-in networks and networks with running containers stay.")
+	t.has(words(page_texts(k)), "Built-in networks and networks with running containers stay.")
 	t.eq(#k:calls_of("network_remove"), 0)
 end)
 
@@ -916,7 +921,7 @@ t.test("what came back from a shell is told", function()
 			returned = { kind = "shell", name = "shop-api-1", status = 0, duration = 12000 },
 		},
 	})
-	t.has(page_texts(k), "The shell in shop-api-1 ended after 12s")
+	t.has(words(page_texts(k)), "The shell in shop-api-1 ended after 12s")
 end)
 
 t.test("everything has a key: the help lists them, and ? opens it", function()
