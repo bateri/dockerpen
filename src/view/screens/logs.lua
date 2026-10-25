@@ -11,7 +11,8 @@ local ansi = lib_ansi.ansi
 local fmt = lib_fmt.fmt
 local LOG_MOST, SIZE = lib_sizes.LOG_MOST, lib_sizes.SIZE
 local views, virtual = lib_virtual.views, lib_virtual.virtual
-local L, log_live = model_log.L, model_log.log_live
+local L, log_live, log_top, log_tops, log_total =
+	model_log.L, model_log.log_live, model_log.log_top, model_log.log_tops, model_log.log_total
 local S = model_state.S
 local P, T = parts_ui.P, parts_ui.T
 
@@ -58,35 +59,88 @@ local function shift_runs(runs, n)
 	return out
 end
 
--- One line of the log as a row of the runs it is in.
-local function log_line(index, current)
-	local err = string.byte(L.streams, index) == 101
-	local matched = L.query_on and L.match_set and L.match_set[index]
-	local row = b.div():row():items_center():gap(8):h(SIZE.line):px(14):clip():no_shrink()
-	if current then
-		row:bg(alpha("warning", 0.28))
-	elseif matched then
-		row:bg(alpha("warning", 0.13))
+-- The width of a character of the log, as a share of its size (the font of a terminal is one width
+-- all through, a little under this), and the size of its text.
+local CHAR = 0.62
+local LOG_TEXT = SIZE.small + 1
+
+-- The runs of a line cut into rows of `cols` characters.
+local function wrap_runs(runs, cols)
+	local rows, row, used = {}, {}, 0
+	for _, run in ipairs(runs) do
+		local text = run.text
+		local length = utf8.len(text) or #text
+		local from = 1
+		while length > 0 do
+			local take = math.min(length, cols - used)
+			local cut = utf8.offset(text, take + 1) or (#text + 1)
+			row[#row + 1] = { text = string.sub(text, from, cut - 1), fg = run.fg, bold = run.bold, dim = run.dim }
+			from, length, used = cut, length - take, used + take
+			if used >= cols and length > 0 then
+				rows[#rows + 1], row, used = row, {}, 0
+			end
+		end
 	end
-	row:child(b.div():w(3):h(SIZE.line - 5):rounded(1.5):no_shrink():bg(err and "error" or nil))
-	if L.timestamps then
-		row:child(T(L.clocks[index] or "", "quiet", SIZE.small + 0.5):no_shrink())
-	end
+	rows[#rows + 1] = row
+	return rows
+end
+
+-- One row of the words of a line: the runs of it, each in its colour.
+local function words_of(runs)
 	local words = b.div():row():items_center():no_shrink()
-	local shown = log_runs(index)
-	if L.hscroll > 0 then
-		shown = shift_runs(shown, L.hscroll)
-		row:child(T("‹", "quiet", SIZE.small + 0.5):no_shrink())
-	end
-	for _, run in ipairs(shown) do
+	for _, run in ipairs(runs) do
 		local role = run.fg
 		if run.dim then
 			role = "dim"
 		end
-		words:child(T(run.text, role, SIZE.small + 0.5, run.bold and 700 or nil):no_shrink())
+		words:child(T(run.text, role, LOG_TEXT, run.bold and 700 or nil):no_shrink())
 	end
-	row:child(words)
-	return row
+	return words
+end
+
+-- One line of the log, as the rows it takes: in the colours it was written in, in red-edged rows
+-- where it came on the error stream, lit where the search found it.
+local function log_line(index, current, cols)
+	local err = string.byte(L.streams, index) == 101
+	local matched = L.query_on and L.match_set and L.match_set[index]
+	local shown = log_runs(index)
+	local rows
+	if L.hscroll > 0 and not L.wrap then
+		shown = shift_runs(shown, L.hscroll)
+	end
+	if L.wrap and cols then
+		rows = wrap_runs(shown, cols)
+	else
+		rows = { shown }
+	end
+	local line = b.div():col():no_shrink():h(#rows * SIZE.line)
+	if current then
+		line:bg(alpha("warning", 0.14))
+	elseif matched then
+		line:bg(alpha("warning", 0.07))
+	elseif err then
+		line:bg(alpha("error", 0.05))
+	end
+	for position, runs in ipairs(rows) do
+		local row = b.div():row():items_center():gap(8):h(SIZE.line):pr(12):clip():no_shrink()
+		row:child(
+			b.div():w(2):h(SIZE.line):no_shrink():bg(err and alpha("error", 0.7) or (current and "warning" or nil))
+		)
+		if L.timestamps then
+			row:child(
+				b.div()
+					:w(90)
+					:no_shrink()
+					:child(position == 1 and T(L.clocks[index] or "", "quiet", SIZE.small):no_shrink() or b.div())
+			)
+		end
+		if position == 1 and L.hscroll > 0 and not L.wrap then
+			row:child(T("‹", "quiet", SIZE.small + 0.5):no_shrink())
+		end
+		row:child(words_of(runs))
+		line:child(row)
+	end
+	return line
 end
 
 -- Looks through the lines the query has not been tried on, so many at a time (a log can be
@@ -115,54 +169,38 @@ local function scan_log(budget)
 	if not L.pinned_match and #matches > 0 and L.match_at ~= #matches then
 		L.match_at = #matches
 		L.follow = false
-		ui:set_scroll("log", math.max((matches[#matches] - 1) * SIZE.line - (views.log or 400) / 2, 0))
+		ui:set_scroll("log", math.max(log_top(matches[#matches]) - (views.log or 400) / 2, 0))
 	end
 	return L.scanned < L.count
 end
 
--- The bar over a log: follow, timestamps, the search and what it found. In a narrow place the
--- search has a row of its own.
+-- The bar over a log: the search and what it found, then what the log shows and does: following,
+-- the time of each line, wrapping; clearing the view, copying it, following it in the terminal.
 local function log_toolbar(width)
-	local narrow = width < 600
-	local small = { h = 24, size = SIZE.small + 0.5 }
-	local function button(id, label, key, extra)
-		local options =
-			{ h = small.h, size = small.size, selected = extra and extra.selected, key = (not narrow) and key or nil }
-		return P.button(id, label, options)
-	end
-	local top = b.div():row():items_center():gap(8):h(narrow and 34 or 40):px(18):no_shrink()
-	top:child(button("l:follow", L.follow and "Following" or "Follow", "End", { selected = L.follow }))
-	top:child(button("l:time", "Timestamps", "t", { selected = L.timestamps }))
-	local search = b.div():row():items_center():gap(8):w(0):grow(1):min_w(0)
-	search:child(P.field(S.field == "logs", "Search the log", nil))
+	local narrow = width < 620
+	local top = b.div():row():items_center():gap(6):h(SIZE.bar + 4):px(12):pt(4):no_shrink()
+	top:child(P.field(S.field == "logs", "Find in logs", nil))
 	if L.query_on and S.query ~= "" then
 		local total = #L.matches
-		local note = total == 0 and (L.scanned < L.count and "looking…" or "no match")
-			or (string.format("%d of %d", math.max(L.match_at, 1), total) .. (L.scanned < L.count and "+" or ""))
-		search:child(T(note, total == 0 and "dim" or "foreground", SIZE.small):no_shrink())
-		search:child(P.button("l:prev", "Prev", { h = 22, px = 8, size = SIZE.small, disabled = total == 0 }))
-		search:child(P.button("l:next", "Next", { h = 22, px = 8, size = SIZE.small, disabled = total == 0 }))
+		local note = total == 0 and (L.scanned < L.count and "…" or "0")
+			or (string.format("%d/%d", math.max(L.match_at, 1), total) .. (L.scanned < L.count and "+" or ""))
+		top:child(T(note, total == 0 and "quiet" or "dim", SIZE.small):no_shrink())
+		top:child(P.switch("l:only", "only", L.only))
 	end
-	if narrow then
-		top:child(b.spacer())
-		if L.count >= L.tail and L.tail < LOG_MOST then
-			top:child(P.button("l:more", "Load more", { h = 22, px = 8, size = SIZE.small }))
-		end
-		top:child(T(fmt.count(L.count, "line"), "quiet", SIZE.small):no_shrink())
-		return b.div():col():no_shrink():child(top):child(b.div():row():items_center():h(34):px(18):child(search))
+	top:child(P.switch("l:follow", "follow", L.follow))
+	top:child(P.switch("l:time", "time", L.timestamps))
+	top:child(P.switch("l:wrap", "wrap", L.wrap))
+	if not narrow then
+		top:child(P.icon_button("l:clear", "eraser", { icon_size = 13 }))
+		top:child(P.icon_button("l:copy", "copy", { icon_size = 13 }))
+		top:child(P.icon_button("d:follow", "arrow-right-left", { icon_size = 13 }))
 	end
-	top:child(search)
-	if L.count >= L.tail and L.tail < LOG_MOST then
-		top:child(P.button("l:more", "Load more", { key = "L", h = 22, px = 8, size = SIZE.small }))
-	end
-	top:child(T(fmt.count(L.count, "line"), "quiet", SIZE.small):no_shrink())
 	return top
 end
 
 local function log_tab(c, width)
 	local box = b.div():col():grow(1):min_h(0)
 	box:child(log_toolbar(width))
-	box:child(b.div():h(1):bg(alpha("border", 0.6)):no_shrink())
 	if L.id ~= c.id then
 		return box:child(P.nothing("Opening the log…"))
 	end
@@ -171,26 +209,57 @@ local function log_tab(c, width)
 			or "It has written nothing yet."
 		return box:child(P.nothing(words, L.ended == nil and "Lines show here as the container writes them." or nil))
 	end
+	-- The characters a row has room for: the width of the panel less the edge, the time, the margin.
+	local cols = math.max(math.floor((width - 2 - 8 - 12 - (L.timestamps and 98 or 0)) / (LOG_TEXT * CHAR)), 10)
+	L.cols = cols
+	local searching = L.only and L.query_on and S.query ~= ""
+	local tops = nil
+	local count = L.count
+	if searching then
+		count = #L.matches
+	else
+		tops = log_tops(cols)
+	end
 	local view = views.log or 400
-	if L.follow then
-		ui:set_scroll("log", math.max(L.count * SIZE.line + 8 - view, 0))
+	if L.follow and not searching then
+		ui:set_scroll("log", math.max(log_total() + 4 - view, 0))
 	end
 	local current = L.matches[L.match_at]
-	box:child(virtual("log", L.count, SIZE.line, function(index)
-		return log_line(index, index == current)
-	end, { px = 0, pt = 4 }))
-	local footer = nil
-	if not L.follow and L.new_since > 0 then
-		footer = T("↓ " .. fmt.count(L.new_since, "new line") .. " — End follows", "accent", SIZE.small)
-	elseif L.ended and not log_live() then
-		footer = T(
-			c.state == "running" and "The log stopped here." or "It is not running: the log does not go on.",
-			"dim",
-			SIZE.small
-		)
+	if searching then
+		box:child(virtual("log", count, SIZE.line, function(index)
+			return log_line(L.matches[index], L.matches[index] == current, cols)
+		end, { px = 0, pt = 4 }))
+	else
+		box:child(virtual("log", count, SIZE.line, function(index)
+			return log_line(index, index == current, cols)
+		end, { px = 0, pt = 4, tops = tops }))
 	end
-	if footer then
-		box:child(b.div():row():items_center():h(22):px(18):no_shrink():bg("raised1"):child(footer))
+	if not L.follow and L.new_since > 0 then
+		box:child(
+			b.div():row():items_center():justify_center():h(26):no_shrink():child(
+				b.div()
+					:row()
+					:items_center()
+					:gap(6)
+					:h(22)
+					:px(10)
+					:rounded(11)
+					:bg("accent")
+					:press("l:follow")
+					:child(P.icon("arrow-down", 12, "background"))
+					:child(T(fmt.count(L.new_since, "new line"), "background", SIZE.small, 600))
+			)
+		)
+	elseif L.ended and not log_live() then
+		box:child(
+			b.div():row():items_center():h(22):px(14):no_shrink():child(
+				T(
+					c.state == "running" and "The log stopped here." or "It is not running: the log does not go on.",
+					"dim",
+					SIZE.small
+				)
+			)
+		)
 	end
 	return box
 end

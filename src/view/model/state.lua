@@ -1,5 +1,6 @@
 local lib_sizes = require("../lib/sizes")
-local LOG_TAIL, RAIL_FROM, SIZE = lib_sizes.LOG_TAIL, lib_sizes.RAIL_FROM, lib_sizes.SIZE
+local LOG_TAIL, RAIL_COMPACT_BELOW, RAIL_FROM, SIZE =
+	lib_sizes.LOG_TAIL, lib_sizes.RAIL_COMPACT_BELOW, lib_sizes.RAIL_FROM, lib_sizes.SIZE
 
 -- ---- what the page holds ---------------------------------------------------------------------
 
@@ -22,6 +23,8 @@ local S = {
 	by_id = {},
 	samples = {}, -- the last reading of each running container, by its short id
 	series = {}, -- the last two minutes of each, by its short id: cpu, memory, net_in, net_out
+	totals = {}, -- the cpu and the memory of all the containers together, a reading each: { cpu =, memory = }
+	live_from = 0, -- the newest event of the backlog: what comes after it is news
 	activity = {}, -- what the engine reported, newest first
 	jobs = {},
 	lists = {}, -- images, volumes, networks: as the program listed them, once it has
@@ -41,7 +44,11 @@ local S = {
 	filter = "all",
 	group = true,
 	folded = {}, -- compose project -> true / false, as the person left it
+	folded_known = false, -- the page has said which projects are folded, or been told
 	sort = "name",
+	plain_filter = {}, -- by section: which of the segments of its bar is on
+	image_sort = "created",
+	system_pick = 1, -- the part of the disk the cursor is on
 	query = "", -- what the host's text field says
 	open = nil, -- the container whose detail is open
 	open_at = 0, -- when it was opened
@@ -61,7 +68,8 @@ local S = {
 		last = nil, -- the time docker gave the last line
 		follow = true,
 		timestamps = false,
-		wrap = false,
+		wrap = true,
+		only = false, -- of the lines, only the ones the search found
 		ended = nil, -- why the log stopped, once it has
 		tail = LOG_TAIL,
 		sub = nil,
@@ -78,6 +86,7 @@ local S = {
 	toasts = {},
 	dialog = nil,
 	help = false,
+	palette = nil, -- the command palette, when it is up: { active = the entry the cursor is on }
 	menu = nil, -- what the entries of the menu that is up do
 	rev = 0,
 	cache = {},
@@ -92,10 +101,16 @@ end
 -- How wide the main part of the page is (what is not the rail), and whether the detail of a
 -- container is beside the list or over it.
 local function geometry()
-	local rail = S.width >= RAIL_FROM and SIZE.rail or 0
+	local compact = S.width < RAIL_COMPACT_BELOW
+	local rail = 0
+	if S.width >= RAIL_FROM then
+		rail = (compact and SIZE.rail_compact or SIZE.rail) + 1
+	end
 	local main = S.width - rail
-	local beside = main >= 880
-	return { rail = rail, main = main, beside = beside }
+	local beside = main >= 860
+	-- The detail takes a share of what there is, a little less than half.
+	local detail = math.max(340, math.min(S.detail_width or math.floor(main * 0.46), main - 380))
+	return { rail = rail, compact = compact, main = main, beside = beside, detail = detail }
 end
 
 return {

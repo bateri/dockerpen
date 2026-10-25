@@ -2,53 +2,61 @@
 
 local fmt = {}
 
-local BYTE_UNITS = { "B", "KiB", "MiB", "GiB", "TiB" }
-
--- A number of bytes: `936 KiB`, `1.2 GiB`.
+-- A size in bytes as docker counts disk: decimal units (`1.2 GB`), `–` where there is none.
 function fmt.bytes(n)
-	if n == nil then
+	if n == nil or n < 0 then
 		return "–"
 	end
-	local unit = 1
-	while n >= 1024 and unit < #BYTE_UNITS do
-		n /= 1024
-		unit += 1
-	end
-	if unit == 1 then
-		return string.format("%d B", n)
-	end
-	return string.format(n >= 100 and "%.0f %s" or (n >= 10 and "%.1f %s" or "%.2f %s"), n, BYTE_UNITS[unit])
-end
-
--- A size as docker counts disk: decimal units, as `docker system df` writes them.
-function fmt.disk(n)
-	if n == nil then
-		return "–"
-	end
-	local units = { "B", "kB", "MB", "GB", "TB" }
+	local units = { "B", "KB", "MB", "GB", "TB" }
 	local unit = 1
 	while n >= 1000 and unit < #units do
 		n /= 1000
 		unit += 1
 	end
-	if unit == 1 then
-		return string.format("%d B", n)
+	if unit == 1 or n >= 100 then
+		return string.format("%.0f %s", n, units[unit])
 	end
-	return string.format(n >= 100 and "%.0f %s" or (n >= 10 and "%.1f %s" or "%.2f %s"), n, units[unit])
+	return string.format("%.1f %s", n, units[unit])
+end
+
+-- Memory as `docker stats` writes it: powers of 1024 (`936 KiB`, `7.2 MiB`).
+function fmt.memory(n)
+	if n == nil or n < 0 then
+		return "–"
+	end
+	local units = { "B", "KiB", "MiB", "GiB", "TiB" }
+	local unit = 1
+	while n >= 1024 and unit < #units do
+		n /= 1024
+		unit += 1
+	end
+	if unit == 1 or n >= 100 then
+		return string.format("%.0f %s", n, units[unit])
+	end
+	return string.format("%.1f %s", n, units[unit])
+end
+
+-- The same without the space, where the room is short (`7.2MiB`).
+function fmt.memory_tight(n)
+	return (string.gsub(fmt.memory(n), " ", ""))
 end
 
 function fmt.rate(n)
+	if n == nil or n < 1 then
+		return "0 B/s"
+	end
 	return fmt.bytes(n) .. "/s"
 end
 
-function fmt.percent(n)
+-- A percent with one decimal, none from a hundred (`0.9%`, `37.6%`, `120%`), or `digits` decimals.
+function fmt.percent(n, digits)
 	if n == nil then
 		return "–"
 	end
-	if n >= 100 then
+	if n >= 100 or digits == 0 then
 		return string.format("%.0f%%", n)
 	end
-	return string.format("%.1f%%", n)
+	return string.format("%." .. (digits or 1) .. "f%%", n)
 end
 
 -- Seconds as the longest unit that fits: `45s`, `3m`, `2h`, `5d`.
@@ -115,6 +123,13 @@ function fmt.has(text, needle)
 		return string.find(text, needle, 1, true) ~= nil
 	end
 	return string.find(string.lower(text), needle, 1, true) ~= nil
+end
+
+-- An image's name without the registry's default parts: `docker.io/library/nginx` is `nginx`.
+function fmt.image_name(reference)
+	local name = string.gsub(reference or "", "^docker%.io/", "")
+	name = string.gsub(name, "^library/", "")
+	return name
 end
 
 -- A count and its noun: `1 container`, `3 containers`.

@@ -2,17 +2,27 @@ local lib_kit = require("../lib/kit")
 local lib_sizes = require("../lib/sizes")
 local lib_virtual = require("../lib/virtual")
 local model_act = require("../model/act")
+local model_dialog = require("../model/dialog")
+local model_disk = require("../model/disk")
 local model_log = require("../model/log")
 local model_nav = require("../model/nav")
+local model_palette = require("../model/palette")
+local model_containers = require("../model/containers")
 local model_net = require("../model/net")
 local model_rows = require("../model/rows")
 local model_state = require("../model/state")
+local model_toast = require("../model/toast")
 local b, ui = lib_kit.b, lib_kit.ui
 local FILTERS, LOG_MOST, SECTIONS, SIZE, TABS =
 	lib_sizes.FILTERS, lib_sizes.LOG_MOST, lib_sizes.SECTIONS, lib_sizes.SIZE, lib_sizes.TABS
 local reveal, views = lib_virtual.reveal, lib_virtual.views
 local act = model_act.act
-local L, log_clear, on_log = model_log.L, model_log.log_clear, model_log.on_log
+local port_url = model_containers.port_url
+local toast = model_toast.toast
+local dialog = model_dialog.dialog
+local palette = model_palette.palette
+local DISK = model_disk.DISK
+local L, log_clear, log_top, on_log = model_log.L, model_log.log_clear, model_log.log_top, model_log.on_log
 local ask_clean, ask_pull, current_container, cursor_row, field_context, go, step =
 	model_nav.ask_clean,
 	model_nav.ask_pull,
@@ -22,8 +32,8 @@ local ask_clean, ask_pull, current_container, cursor_row, field_context, go, ste
 	model_nav.go,
 	model_nav.step
 local net = model_net.net
-local SORTS, index_of, keep_cursor, rows_of =
-	model_rows.SORTS, model_rows.index_of, model_rows.keep_cursor, model_rows.rows_of
+local index_of, keep_cursor, marked, row_tops, rows_of =
+	model_rows.index_of, model_rows.keep_cursor, model_rows.marked, model_rows.row_tops, model_rows.rows_of
 local S, bump, geometry = model_state.S, model_state.bump, model_state.geometry
 
 -- ---- keys --------------------------------------------------------------------------------------------------
@@ -31,44 +41,64 @@ local S, bump, geometry = model_state.S, model_state.bump, model_state.geometry
 local keys = {}
 
 local function reply_field()
+	S.typing = true
 	return { redraw = true, keyboard = "field" }
 end
 
--- A question is open: its keys.
+-- A question is open: its keys. Where the host's field has the keyboard it takes the letters; what
+-- comes here is the keys it gives back (⏎, ⇥, ↓ and Esc leave it without a word).
 function keys.dialog(key)
 	local d = S.dialog
-	if key == "escape" or key == "n" or key == "N" then
-		S.dialog = nil
-		bump()
+	if key == "escape" or key == "n" and d.kind ~= "pull" then
+		dialog.close()
 		return true
-	elseif key == "y" or key == "Y" then
-		if d.field and string.gsub(S.query, "%s", "") == "" then
-			return false
-		end
-		S.dialog = nil
-		bump()
-		d.run()
-		return true
-	elseif key == "enter" then
-		if d.choice == "confirm" then
-			if d.field and string.gsub(S.query, "%s", "") == "" then
-				return false
-			end
-			S.dialog = nil
-			bump()
-			d.run()
-		else
-			S.dialog = nil
-			bump()
+	elseif key == "enter" or key == "y" and d.kind ~= "pull" then
+		if not dialog.confirm() and d.kind == "pull" then
+			return reply_field()
 		end
 		return true
-	elseif key == "tab" or key == "left" or key == "right" then
-		d.choice = d.choice == "confirm" and "cancel" or "confirm"
+	elseif key == "up" or key == "k" then
+		dialog.move(-1)
+		return true
+	elseif key == "down" or key == "j" or key == "tab" then
+		dialog.move(1)
+		return true
+	elseif key == "space" or key == " " then
+		dialog.toggle(d.cursor)
 		return true
 	elseif key == "/" and d.field then
 		return reply_field()
 	end
 	return false
+end
+
+-- The palette is up: its keys. The host's field has the letters; what comes here is what it gives
+-- back (⏎, ⇥, ↓ and Esc leave it without a word), and the arrows.
+function keys.palette(key, mods)
+	if key == "escape" then
+		palette.close()
+	elseif key == "enter" then
+		if not palette.run() then
+			return reply_field()
+		end
+	elseif key == "down" or (mods and mods.control and key == "n") then
+		palette.move(1)
+	elseif key == "up" or (mods and mods.control and key == "p") then
+		palette.move(-1)
+	elseif key == "page_down" then
+		palette.move(6)
+	elseif key == "page_up" then
+		palette.move(-6)
+	elseif key == "tab" then
+		return true
+	elseif #key == 1 and not (mods and (mods.control or mods.command)) then
+		-- A letter after the field gave the keyboard back: the field has it again (this letter is
+		-- not in it: the host's field takes keys itself, and this one went to the page).
+		return reply_field()
+	else
+		return nil
+	end
+	return true
 end
 
 -- Scrolls a scrolling box by `dy`, in points.
@@ -103,6 +133,15 @@ local function log_keys(key, mods)
 		L.follow, L.new_since = true, 0
 	elseif key == "t" then
 		L.timestamps = not L.timestamps
+	elseif key == "w" then
+		L.wrap = not L.wrap
+		L.tops = nil
+		L.runs, L.run_count = {}, 0
+	elseif key == "space" or key == " " then
+		L.follow = not L.follow
+		if L.follow then
+			L.new_since = 0
+		end
 	elseif key == "n" or key == "N" then
 		local total = #L.matches
 		if total == 0 then
@@ -115,7 +154,7 @@ local function log_keys(key, mods)
 			at = (at - 2) % total + 1
 		end
 		L.match_at, L.follow, L.pinned_match = at, false, true
-		ui:set_scroll("log", math.max((L.matches[at] - 1) * SIZE.line - view / 2, 0))
+		ui:set_scroll("log", math.max(log_top(L.matches[at]) - view / 2, 0))
 	elseif key == "L" then
 		if L.tail < LOG_MOST then
 			L.tail = math.min(L.tail * 5, LOG_MOST)
@@ -182,7 +221,7 @@ local function list_navigation(key)
 		elseif row and row.kind == "container" and row.c.project and S.group then
 			-- To the head of its project.
 			S.cursor.containers = "group:" .. row.c.project
-			reveal("list", index_of(rows, S.cursor.containers) or 1, #rows, SIZE.row)
+			reveal("list", index_of(rows, S.cursor.containers) or 1, #rows, SIZE.row, nil, row_tops("containers"))
 			bump()
 		end
 	else
@@ -239,7 +278,22 @@ local function container_actions(key, g)
 		bump()
 		keep_cursor("containers")
 	elseif key == "o" then
-		S.sort = step(SORTS, S.sort, 1)
+		-- A page cannot open a link: the address is copied, for the browser.
+		local url = c and port_url(c)
+		if url then
+			S.copy = url
+			toast.say(
+				"Copied " .. url,
+				{ kind = "info", body = "A page cannot open a link in a browser: paste it there." }
+			)
+		elseif c then
+			toast.say(c.name .. " publishes no port", { kind = "info" })
+		end
+	elseif key == "<" then
+		S.detail_width = math.min((S.detail_width or 0) + 40, 2000)
+		bump()
+	elseif key == ">" then
+		S.detail_width = math.max((S.detail_width or 460) - 40, 340)
 		bump()
 	elseif key == "." then
 		local at = { x = 220, y = 160 }
@@ -302,37 +356,12 @@ function keys.containers(key, mods, g)
 	elseif list_navigation(key) then
 		return true
 	end
-	if key == "u" then
-		ask_pull()
-		return true
-	elseif key == "c" then
-		ask_clean()
-		return true
-	end
 	return container_actions(key, g)
 end
 
 -- Keys of the lists of images, volumes and networks, and of the activity.
 function keys.plain(key, mods, g)
 	local section = S.section
-	if section == "images" and S.layer_open then
-		if key == "escape" or key == "left" then
-			S.layer_open = nil
-			bump()
-		elseif key == "u" then
-			go.update_image(S.layer_open)
-		elseif key == "d" then
-			S.cursor.images = S.layer_open
-			act.remove_listed("images")
-		elseif key == "up" or key == "k" then
-			scroll_by("list", -SIZE.row)
-		elseif key == "down" or key == "j" then
-			scroll_by("list", SIZE.row)
-		else
-			return nil
-		end
-		return true
-	end
 	local row = cursor_row(section)
 	local page = math.max(math.floor((views.list or 400) / SIZE.row) - 1, 1)
 	if key == "down" or key == "j" then
@@ -357,15 +386,30 @@ function keys.plain(key, mods, g)
 		go.mark_all(section, false)
 	elseif key == "d" and section ~= "activity" then
 		act.remove_listed(section)
-	elseif key == "u" and (section == "images" or section == "containers") then
+	elseif key == "p" and section == "images" then
 		ask_pull()
-	elseif key == "c" then
-		ask_clean()
+	elseif key == "u" and section == "images" then
+		if row then
+			go.update_image(row.id)
+		end
+	elseif key == "y" and row and section ~= "activity" then
+		S.copy = section == "images" and (row.item.tags[1] or row.id) or (row.item.name or row.id)
+		toast.say("Copied the name", { kind = "success" })
+	elseif key == "left" and section == "images" then
+		go.layers(nil)
+	elseif key == "escape" then
+		if #marked(section) > 0 then
+			go.mark_all(section, false)
+		elseif S.layer_open then
+			go.layers(nil)
+		elseif S.query ~= "" then
+			return nil
+		else
+			return nil
+		end
 	elseif key == "enter" or key == "right" then
 		if section == "images" and row then
-			S.layer_open = row.id
-			ui.scroll.list = nil
-			bump()
+			go.layers(key == "enter" and S.layer_open == row.id and nil or row.id)
 		elseif section == "activity" and row and row.item.type == "container" and S.by_id[row.item.id] then
 			go.section("containers")
 			S.cursor.containers = row.item.id
@@ -384,9 +428,11 @@ function keys.system(key)
 	if key == "c" then
 		ask_clean()
 	elseif key == "up" or key == "k" then
-		scroll_by("system.scroll", -40)
+		S.system_pick = math.max(S.system_pick - 1, 1)
 	elseif key == "down" or key == "j" then
-		scroll_by("system.scroll", 40)
+		S.system_pick = math.min(S.system_pick + 1, #DISK)
+	elseif key == "enter" then
+		go.free(S.system_pick)
 	elseif key == "page_up" then
 		scroll_by("system.scroll", -300)
 	elseif key == "page_down" then
@@ -407,6 +453,9 @@ function keys.press(key, mods)
 	if S.dialog then
 		return keys.dialog(key)
 	end
+	if S.palette then
+		return keys.palette(key, mods)
+	end
 	if S.help then
 		if key == "escape" or key == "?" or key == "q" then
 			S.help = false
@@ -418,8 +467,24 @@ function keys.press(key, mods)
 		end
 		return true
 	end
+	if mods and mods.control and not mods.alt and not mods.command and key == "k" then
+		palette.open()
+		return true
+	end
 	if mods and (mods.control or mods.alt or mods.command) then
 		return nil
+	end
+	if key == ":" then
+		palette.open()
+		return true
+	end
+	if key == "R" then
+		for _, section in ipairs({ "images", "volumes", "networks", "system" }) do
+			S.stale[section] = true
+		end
+		S.pending_reload = S.now
+		bump()
+		return true
 	end
 	if key == "?" then
 		S.help = true
@@ -429,7 +494,7 @@ function keys.press(key, mods)
 		-- What the newest toast that offers a way back offers (a stop can be undone).
 		for index = #S.toasts, 1, -1 do
 			local item = S.toasts[index]
-			if item.action then
+			if item.action and item.action.run then
 				table.remove(S.toasts, index)
 				item.action.run()
 				bump()

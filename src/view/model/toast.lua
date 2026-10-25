@@ -5,7 +5,9 @@ local S = model_state.S
 
 local toast = {}
 
-local TOAST_SECONDS = 6
+-- How long it stays: nine seconds where it is bad news, four and a half where it is not.
+local TOAST_SECONDS = 4.5
+local TOAST_BAD_SECONDS = 9
 
 -- Tells something for a few seconds. `options.kind` is the role it is in (success, error, warning,
 -- info); `options.action = { label =, run = function }` is a verb it offers while it is up (undo).
@@ -13,10 +15,11 @@ function toast.say(text, options)
 	options = options or {}
 	local item = {
 		text = text,
+		body = options.body,
 		kind = options.kind or "info",
 		action = options.action,
 		show = options.show,
-		until_ = S.now + (options.seconds or TOAST_SECONDS),
+		until_ = S.now + (options.seconds or ((options.kind == "error") and TOAST_BAD_SECONDS or TOAST_SECONDS)),
 	}
 	S.toasts[#S.toasts + 1] = item
 	while #S.toasts > 4 do

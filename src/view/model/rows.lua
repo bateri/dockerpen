@@ -1,13 +1,16 @@
 local lib_fmt = require("../lib/fmt")
+local lib_sizes = require("../lib/sizes")
 local model_containers = require("./containers")
 local model_state = require("./state")
 local fmt = lib_fmt.fmt
+local SIZE = lib_sizes.SIZE
 local has_issue, is_up = model_containers.has_issue, model_containers.is_up
 local S = model_state.S
 
 -- ---- the rows of the lists ----------------------------------------------------------------------
 
 local SORTS = { "name", "state", "cpu", "memory", "created" }
+local SORT_LABELS = { name = "Name", state = "State", cpu = "CPU", memory = "Memory", created = "Newest" }
 
 local function sort_value(c, how)
 	local sample = S.samples[c.short]
@@ -55,13 +58,10 @@ local function status_shows(c)
 	return true
 end
 
--- Whether a project is folded: as the person left it, and otherwise when nothing of it runs.
+-- Whether a project is folded: as the person left it. (A project with nothing running is folded
+-- the first time the page sees it, by `on_containers`: from then on it is the person's.)
 local function folded(group)
-	local explicit = S.folded[group.key]
-	if explicit ~= nil then
-		return explicit
-	end
-	return group.up == 0
+	return S.folded[group.key] == true
 end
 
 -- The containers as the rows of the list: a row for each project that has any (when grouped), and
@@ -87,41 +87,69 @@ local function container_rows()
 		return x.name < y.name
 	end)
 	local rows = {}
+	-- A project is counted over all of its containers, whatever the filter shows of them.
+	local whole = {}
+	for _, c in ipairs(S.containers) do
+		local key = c.project or ""
+		local count = whole[key]
+		if count == nil then
+			count = { total = 0, up = 0, running = 0, issues = 0 }
+			whole[key] = count
+		end
+		count.total += 1
+		if is_up(c) then
+			count.up += 1
+		end
+		if c.state == "running" then
+			count.running += 1
+		end
+		if has_issue(c) then
+			count.issues += 1
+		end
+	end
 	if S.group then
 		local groups, order = {}, {}
 		for _, c in ipairs(list) do
 			local key = c.project or ""
 			local group = groups[key]
 			if group == nil then
-				group =
-					{ kind = "group", key = key, name = c.project or "Standalone", members = {}, up = 0, issues = 0 }
+				local count = whole[key]
+				group = {
+					kind = "group",
+					key = key,
+					name = c.project or "Standalone",
+					members = {},
+					up = count.up,
+					total = count.total,
+					issues = count.issues,
+				}
 				groups[key] = group
 				order[#order + 1] = group
 			end
 			group.members[#group.members + 1] = c
-			if is_up(c) then
-				group.up += 1
-			end
-			if has_issue(c) then
-				group.issues += 1
-			end
 		end
 		table.sort(order, function(x, y)
-			if (x.up > 0) ~= (y.up > 0) then
-				return x.up > 0
-			end
 			if (x.key == "") ~= (y.key == "") then
 				return y.key == ""
 			end
+			if (x.up > 0) ~= (y.up > 0) then
+				return x.up > 0
+			end
 			return x.name < y.name
 		end)
+		-- A list that is only the containers of no project is not grouped.
+		local only_standalone = #order == 1 and order[1].key == ""
 		for _, group in ipairs(order) do
 			group.id = "group:" .. group.key
-			group.folded = folded(group)
-			rows[#rows + 1] = group
+			group.grouped = not only_standalone
+			-- A search looks into the projects that are folded.
+			group.folded = group.grouped and folded(group) and query == ""
+			if group.grouped then
+				rows[#rows + 1] = group
+			end
 			if not group.folded then
 				for _, c in ipairs(group.members) do
-					rows[#rows + 1] = { kind = "container", id = c.id, c = c }
+					rows[#rows + 1] = { kind = "container", id = c.id, c = c, grouped = group.grouped }
 				end
 			end
 		end
@@ -147,6 +175,17 @@ local function counts()
 		end
 	end
 	return { all = all, running = running, stopped = stopped, issues = issues }
+end
+
+-- Whether an event of the engine is a problem: a container that ran out of memory, that turned
+-- unhealthy, or that stopped with a failure code.
+local function is_problem(item)
+	local detail = item.detail or {}
+	local action = item.action or ""
+	return action == "oom"
+		or string.find(action, "unhealthy", 1, true) ~= nil
+		or detail.status == "unhealthy"
+		or (action == "die" and detail.exitCode ~= nil and tostring(detail.exitCode) ~= "0")
 end
 
 -- The names a row of another list is looked for by.
@@ -184,25 +223,38 @@ local function plain_rows(section)
 	local list = S.lists[section] or {}
 	local rows = {}
 	local query = S.query
+	local narrowed = S.plain_filter[section] or "all"
 	if section == "images" then
 		for _, image in ipairs(list) do
-			if image_matches(image, query) then
+			local used = #(image.containers or {}) > 0
+			local passes = narrowed == "all"
+				or (narrowed == "used" and used)
+				or (narrowed == "unused" and not used)
+				or (narrowed == "dangling" and image.dangling)
+			if passes and image_matches(image, query) then
 				rows[#rows + 1] = { id = image.id, item = image }
 			end
 		end
+		local how = S.image_sort
 		table.sort(rows, function(x, y)
-			local ux, uy = (x.item.running or 0) > 0, (y.item.running or 0) > 0
-			if ux ~= uy then
-				return ux
-			end
-			if x.item.dangling ~= y.item.dangling then
-				return y.item.dangling
+			if how == "size" and x.item.size ~= y.item.size then
+				return x.item.size > y.item.size
+			elseif how == "created" and (x.item.created or 0) ~= (y.item.created or 0) then
+				return (x.item.created or 0) > (y.item.created or 0)
 			end
 			return image_title(x.item) < image_title(y.item)
 		end)
 	elseif section == "volumes" then
 		for _, volume in ipairs(list) do
-			if query == "" or fmt.has(volume.name, query) or (volume.project and fmt.has(volume.project, query)) then
+			local used = #volume.containers > 0
+			local passes = narrowed == "all"
+				or (narrowed == "used" and used)
+				or (narrowed == "unused" and not used)
+				or (narrowed == "anonymous" and volume.anonymous)
+			if
+				passes
+				and (query == "" or fmt.has(volume.name, query) or (volume.project and fmt.has(volume.project, query)))
+			then
 				rows[#rows + 1] = { id = volume.name, item = volume }
 			end
 		end
@@ -226,10 +278,20 @@ local function plain_rows(section)
 			return x.item.name < y.item.name
 		end)
 	elseif section == "activity" then
+		local kind = S.plain_filter.activity or "all"
 		for _, item in ipairs(S.activity) do
+			local problem = is_problem(item)
+			local passes
+			if kind == "problems" then
+				passes = problem
+			elseif kind == "all" then
+				passes = not (item.type == "network" and item.action == "disconnect")
+			else
+				passes = item.type == kind
+			end
 			local text = (item.name or item.id or "") .. " " .. item.action .. " " .. (item.words or "")
-			if query == "" or fmt.has(text, query) then
-				rows[#rows + 1] = { id = tostring(item.seq), item = item }
+			if passes and (query == "" or fmt.has(text, query)) then
+				rows[#rows + 1] = { id = tostring(item.seq), item = item, problem = problem }
 			end
 		end
 	end
@@ -243,6 +305,83 @@ local function rows_of(section)
 		return (container_rows())
 	end
 	return plain_rows(section)
+end
+
+-- What an image's open row has under it, how tall it is: the tags, who uses it, its layers (a line
+-- each). The panel is made of rows of fixed heights, so that the list knows where its rows start.
+local PANEL = { gap = 8, pad = 10, tags = 22, used = 24, layer = 18, layer_gap = 2, loading = 60, top = 2, bottom = 10 }
+
+local function layers_height(image)
+	local slot = S.layers[image.id]
+	if slot == nil or (slot.list == nil and slot.error == nil) then
+		return PANEL.loading
+	elseif slot.error then
+		return PANEL.layer
+	end
+	local n = #slot.list
+	if n == 0 then
+		return PANEL.layer
+	end
+	return n * PANEL.layer + (n - 1) * PANEL.layer_gap
+end
+
+local function image_panel_height(image)
+	local rows = {}
+	if #image.tags > 0 then
+		rows[#rows + 1] = PANEL.tags
+	end
+	if #image.containers > 0 then
+		rows[#rows + 1] = PANEL.used
+	end
+	rows[#rows + 1] = layers_height(image)
+	local total = PANEL.pad * 2 + PANEL.top + PANEL.bottom
+	for _, height in ipairs(rows) do
+		total += height
+	end
+	return total + PANEL.gap * (#rows - 1)
+end
+
+-- Where each row of a list starts, where the rows are not all of one height (a project's head has a
+-- gap above it); `nil` where they are. The last entry is where the list ends.
+local function row_tops(section)
+	if section ~= "containers" and section ~= "activity" and section ~= "images" then
+		return nil
+	end
+	local cached = S.cache["tops:" .. section]
+	if cached and cached.rev == S.rev then
+		return cached.tops
+	end
+	local tops, y = {}, 0
+	if section == "containers" then
+		for index, row in ipairs(container_rows()) do
+			tops[index] = y
+			y += SIZE.row + ((row.kind == "group" and index > 1) and 6 or 0)
+		end
+		tops[#tops + 1] = y
+	elseif section == "images" then
+		for index, row in ipairs(plain_rows("images")) do
+			tops[index] = y
+			y += SIZE.row
+			if S.layer_open == row.id then
+				y += image_panel_height(row.item)
+			end
+		end
+		tops[#tops + 1] = y
+	else
+		-- A day's first event has the name of the day over it.
+		local day = nil
+		for index, row in ipairs(plain_rows("activity")) do
+			tops[index] = y
+			y += SIZE.row
+			if row.item.day ~= day then
+				day = row.item.day
+				y += 30
+			end
+		end
+		tops[#tops + 1] = y
+	end
+	S.cache["tops:" .. section] = { rev = S.rev, tops = tops }
+	return tops
 end
 
 -- The index of the row with `id` among `rows` (or nil), and of the cursor of `section`.
@@ -306,14 +445,19 @@ end
 
 return {
 	SORTS = SORTS,
+	SORT_LABELS = SORT_LABELS,
 	container_rows = container_rows,
 	counts = counts,
 	folded = folded,
+	PANEL = PANEL,
+	image_panel_height = image_panel_height,
 	image_title = image_title,
+	is_problem = is_problem,
 	index_of = index_of,
 	keep_cursor = keep_cursor,
 	marked = marked,
 	plain_rows = plain_rows,
+	row_tops = row_tops,
 	rows_of = rows_of,
 	targets = targets,
 }

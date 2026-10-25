@@ -42,7 +42,7 @@ local function describe(event, asked)
 end
 
 -- The feed of what the engine reports, built on `events` (the feed of its events): each value is
--- `{ seq =, time =, type =, action =, id =, name =, project =, detail =, words =, notice = }`.
+-- `{ seq =, time =, clock =, day =, type =, action =, id =, name =, project =, detail =, words =, notice = }`.
 -- `backlog()` is what was kept, oldest first; it outlives the feed, so a page that comes back
 -- from a shell finds it.
 function M.new(events)
@@ -57,9 +57,13 @@ function M.new(events)
 				end
 				local words = describe(event, asked)
 				seq += 1
+				local at = event.time and math.floor(event.time) or nil
 				local item = {
 					seq = seq,
 					time = event.time,
+					-- The time of the day and the day, in the words of the machine's own clock.
+					clock = at and os.date("%H:%M:%S", at) or nil,
+					day = at and os.date("%A, %b %d", at) or nil,
 					type = event.type,
 					action = event.action,
 					id = event.id,

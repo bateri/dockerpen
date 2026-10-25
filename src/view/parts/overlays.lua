@@ -1,141 +1,266 @@
+-- What comes over the page: the question before something is done, the keys, the toasts, the jobs.
+-- (The menu is the host's, and is asked for with a reply; the palette has its own part.)
+
 local lib_kit = require("../lib/kit")
 local lib_sizes = require("../lib/sizes")
+local model_dialog = require("../model/dialog")
 local model_state = require("../model/state")
 local parts_ui = require("./ui")
 local alpha, b, ui = lib_kit.alpha, lib_kit.b, lib_kit.ui
 local SIZE = lib_sizes.SIZE
+local dialog = model_dialog.dialog
 local S = model_state.S
-local P, T = parts_ui.P, parts_ui.T
-
--- ---- over everything: the question, the help, the toasts, the jobs -----------------------------------
+local fmt = require("../lib/fmt").fmt
+local P, T, hovered = parts_ui.P, parts_ui.T, parts_ui.hovered
 
 local overlays = {}
 
--- A question asked before something is removed. Its buttons are verbs, and the keys that answer
--- are on them.
-function overlays.dialog()
-	local d = S.dialog
-	local card = b.div()
-		:col()
-		:gap(8)
-		:p(18)
-		:w(420)
-		:max_w(520)
-		:rounded(10)
-		:bg("raised2")
-		:border(1, "border")
-		:shadow(0, 8, 24, alpha("shadow", 0.5))
-	card:child(T(d.title, "foreground", 15, 650))
-	if d.lines and d.lines.names then
-		local list = b.div():col():gap(2):p(8):rounded(6):bg("raised1")
-		for _, name in ipairs(d.lines.names) do
-			list:child(P.line(name, "foreground", SIZE.small + 1))
-		end
-		card:child(list)
-	end
-	if d.lines and d.lines.note then
-		card:child(T(d.lines.note, "dim", SIZE.small + 0.5):truncate():max_w(380))
-	end
-	if d.field then
-		card:child(T(d.field.label, "dim", SIZE.small))
-		card:child(P.field(true, d.field.hint))
-	end
-	local buttons = b.div():row():justify_end():gap(8):mt(6)
-	local cancel = P.button("dialog:cancel", "Cancel", { key = "Esc", selected = d.choice == "cancel" })
-	local confirm = P.button("dialog:confirm", d.confirm, {
-		key = "y",
-		danger = d.danger,
-		primary = not d.danger,
-		selected = d.choice == "confirm",
-		disabled = d.field ~= nil and (d.text or "") == "",
-	})
-	if d.choice == "cancel" then
-		cancel:border(1.5, "accent")
+-- A scrim over everything with a card in it; a press on the scrim (not on the card) is `id`.
+local function over(card, id, top)
+	card:press("overlay:card")
+	local scrim = b.div():absolute():inset(0, 0, 0, 0):col():items_center():bg(alpha("background", 0.62)):press(id)
+	if top then
+		scrim:pt(top)
 	else
-		confirm:border(1.5, "accent")
+		scrim:justify_center()
 	end
-	buttons:child(cancel):child(confirm)
-	card:child(buttons)
+	return scrim:child(card)
+end
+
+local function card_of(width)
 	return b.div()
-		:absolute()
-		:inset(0, 0, 0, 0)
+		:col()
+		:gap(12)
+		:p(18)
+		:w(width)
+		:rounded(16)
+		:bg("raised2")
+		:border(1, alpha("border", 0.7))
+		:shadow(0, 12, 32, alpha("shadow", 0.55))
+end
+
+-- A box with a mark that stands for what is asked: red where it is a danger, the info colour where
+-- it is a clean-up.
+local function mark_box(name, role)
+	return b.div()
+		:size(30, 30)
+		:rounded(9)
 		:row()
 		:items_center()
 		:justify_center()
-		:bg(alpha("background", 0.6))
-		:press("dialog:backdrop")
-		:child(card)
+		:no_shrink()
+		:bg(alpha(role, 0.14))
+		:child(P.icon(name, 16, role))
 end
 
+-- One box to tick: its words, what it means, and (where docker has counted) how much it holds.
+local function option_row(d, index, option)
+	local on = d.values[option.key]
+	local id = "dialog:option:" .. index
+	local row = b.div():row():items_start():gap(10):px(10):py(9):rounded(8):press(id):no_shrink()
+	row:bg(hovered(id) and "raised3" or "raised1")
+	if d.cursor == index and #d.options > 1 then
+		row:border(1, alpha("accent", 0.5))
+	end
+	row:child(b.div():pt(1):child(P.check(on)))
+	local main = b.div():col():grow(1):min_w(0):child(T(option.label, "foreground", SIZE.body))
+	if option.hint then
+		main:child(T(option.hint, "quiet", SIZE.small):truncate())
+	end
+	row:child(main)
+	local size = dialog.size_of(option)
+	if size then
+		row:child(T(fmt.bytes(size), "dim", SIZE.small + 0.5):no_shrink())
+	end
+	return row
+end
+
+-- A question: what is asked, boxes to tick, and the two answers.
+function overlays.dialog()
+	local d = S.dialog
+	local wide = d.kind == "prune"
+	local card = card_of(math.min(wide and 620 or 440, S.width - 32))
+	local head = b.div():row():gap(12):items_start()
+	if d.danger then
+		head:child(mark_box("triangle-alert", "error"))
+	elseif d.kind == "prune" then
+		head:child(mark_box("sparkles", "info"))
+	end
+	head:child(
+		b.div()
+			:col()
+			:gap(6)
+			:grow(1)
+			:min_w(0)
+			:child(T(d.title, "foreground", 14, 650):truncate())
+			:child(T(d.body, "dim", SIZE.body):truncate():max_w(wide and 540 or 360))
+	)
+	card:child(head)
+	if d.kind == "pull" then
+		local text = d.reference or ""
+		card:child(
+			b.div()
+				:row()
+				:items_center()
+				:gap(8)
+				:h(34)
+				:px(10)
+				:rounded(8)
+				:bg("background")
+				:border(1, S.typing and "accent" or alpha("border", 0.8))
+				:press("field")
+				:child(P.icon("download", 14, "quiet"))
+				:child(b.div():id("field.room"):text_field():grow(1):min_w(0):h(20))
+		)
+		if string.gsub(text, "%s", "") ~= "" and not S.typing then
+			card:child(T("Pull " .. text, "dim", SIZE.small))
+		end
+		local chips = b.div():row():wrap():gap(6)
+		for index, name in ipairs(dialog.SUGGESTIONS) do
+			local id = "dialog:suggest:" .. index
+			chips:child(
+				b.div()
+					:row()
+					:items_center()
+					:h(22)
+					:px(8)
+					:rounded(11)
+					:press(id)
+					:bg(name == text and alpha("accent", 0.2) or (hovered(id) and "raised4" or "raised3"))
+					:child(T(name, (name == text or hovered(id)) and "foreground" or "dim", SIZE.small))
+			)
+		end
+		card:child(chips)
+	end
+	if d.options and #d.options > 0 then
+		local list = b.div():col():gap(4)
+		for index, option in ipairs(d.options) do
+			list:child(option_row(d, index, option))
+		end
+		card:child(list)
+	end
+	local actions = b.div():row():items_center():gap(8):mt(4)
+	if d.kind == "prune" then
+		local total = dialog.total()
+		local note = b.div():grow(1):min_w(0):row():items_center():gap(5)
+		if total and total > 0 then
+			note:child(T("About", "dim", SIZE.body))
+				:child(T(fmt.bytes(total), "foreground", SIZE.body, 650))
+				:child(T("to free", "dim", SIZE.body))
+		end
+		actions:child(note)
+	else
+		actions:child(b.spacer())
+	end
+	actions:child(P.button("dialog:cancel", "Cancel", { variant = "ghost", suffix = "esc" }))
+	actions:child(P.button("dialog:confirm", d.confirm, {
+		variant = d.danger and "danger" or "primary",
+		suffix = "⏎",
+		disabled = not dialog.ready(),
+	}))
+	card:child(actions)
+	return over(card, "dialog:backdrop")
+end
+
+-- The keys, a section at a time, as the original lists them (what this page cannot do is not here).
 local HELP = {
 	{
-		"Moving",
+		"Anywhere",
 		{
-			{ "↑ ↓  j k", "choose a row" },
-			{ "g G  Home End", "first, last" },
-			{ "⏎  →  ←", "open, fold / back" },
-			{ "1 – 6", "the sections, from containers to activity" },
-			{ "Tab", "list or detail" },
-			{ "/", "filter, or search a log" },
+			{ "Command palette", { ":", "⌃K" } },
+			{ "Go to a section", { "1", "–", "6" } },
+			{ "Search", { "/" } },
+			{ "Refresh", { "R" } },
+			{ "Keyboard shortcuts", { "?" } },
+			{ "Close, go back", { "esc" } },
+			{ "Quit dockerpen", { "⌃C" } },
+		},
+	},
+	{
+		"Lists",
+		{
+			{ "Move", { "↑", "↓" } },
+			{ "Move", { "j", "k" } },
+			{ "First, last", { "g", "G" } },
+			{ "Mark, for many at once", { "space" } },
+			{ "Mark all, none", { "a", "A" } },
+			{ "Open, expand", { "⏎", "→" } },
+			{ "Close, collapse", { "←" } },
+			{ "Context menu", { "." } },
 		},
 	},
 	{
 		"Containers",
 		{
-			{ "space  a  A", "mark, mark all, mark none; a project is all its own" },
-			{ "s  r  p", "start or stop, restart, pause or resume" },
-			{ "e  F", "a shell in it, its log as it comes (in the terminal)" },
-			{ "l  i  [ ]", "logs, inspect, the tab before and after" },
-			{ "K  d  z", "kill, remove (both ask first), take back the last stop" },
-			{ "f  P  o", "next filter, group by project, sort" },
-			{ "y  .", "copy the id, the menu of the row" },
+			{ "Start or stop", { "s" } },
+			{ "Restart", { "r" } },
+			{ "Pause or resume", { "p" } },
+			{ "Shell in the terminal", { "e" } },
+			{ "Logs", { "l" } },
+			{ "Follow logs in the terminal", { "F" } },
+			{ "Inspect", { "i" } },
+			{ "Copy the published port's address", { "o" } },
+			{ "Copy the id", { "y" } },
+			{ "Kill", { "K" } },
+			{ "Remove", { "d" } },
+			{ "Next filter", { "f" } },
+			{ "Group by compose project", { "P" } },
 		},
 	},
 	{
-		"A log",
+		"The detail panel",
 		{
-			{ "↑ ↓  PgUp PgDn", "scroll; scrolling up stops following" },
-			{ "End  t", "follow, timestamps" },
-			{ "n  N", "next match, previous match" },
-			{ "⇧←  ⇧→  0", "read further to the right, and back" },
-			{ "L", "load more lines" },
-		},
-	},
-	{
-		"Everywhere",
-		{
-			{ "u  c", "pull an image, clean up" },
-			{ "?  Esc", "this help, leave what is open" },
-			{ "⌃C", "quit dockerpen" },
+			{ "Between list and panel", { "tab" } },
+			{ "Previous, next tab", { "[", "]" } },
+			{ "Logs: follow", { "space" } },
+			{ "Logs: timestamps, wrap", { "t", "w" } },
+			{ "Logs: next, previous match", { "n", "N" } },
+			{ "Wider, narrower", { "<", ">" } },
 		},
 	},
 }
 
+local function keys_cell(keys)
+	local cell = b.div():row():items_center():gap(3):no_shrink()
+	for _, key in ipairs(keys) do
+		if key == "–" then
+			cell:child(T("–", "quiet", SIZE.small))
+		else
+			cell:child(P.kbd(key))
+		end
+	end
+	return cell
+end
+
 function overlays.help()
-	local card = b.div()
-		:col()
-		:gap(4)
-		:p(20)
-		:w_pct(92)
-		:max_w(660)
-		:rounded(10)
-		:bg("raised2")
-		:border(1, "border")
-		:shadow(0, 8, 24, alpha("shadow", 0.5))
+	local card = card_of(math.min(620, S.width - 32))
 	card:child(
-		b.div():row():items_center():child(T("Keys", "foreground", 15, 650)):child(b.spacer()):child(P.kbd("Esc"))
+		b.div()
+			:row()
+			:items_center()
+			:child(T("Keyboard shortcuts", "foreground", 14, 650):grow(1))
+			:child(P.button("help:close", nil, { variant = "ghost", size = "sm", icon = "x", icon_size = 14 }))
 	)
-	local scroll = b.div():col():gap(2):no_shrink()
+	card:child(
+		T(
+			"Everything the mouse does, the keys do too. A key acts on the marked containers, or on the chosen one.",
+			"dim",
+			SIZE.body
+		):truncate()
+	)
+	local grid = b.div():grid({ b.fr(1), b.fr(1) }):gap_x(24):gap_y(2):pr(4)
 	for _, part in ipairs(HELP) do
-		scroll:child(P.heading(part[1]))
-		for _, entry in ipairs(part[2]) do
-			scroll:child(
+		grid:child(b.div():span(2):pt(10):pb(2):child(T(string.upper(part[1]), "quiet", SIZE.tiny + 0.5, 500)))
+		for _, row in ipairs(part[2]) do
+			grid:child(
 				b.div()
 					:row()
-					:gap(14)
-					:min_h(20)
-					:child(b.div():w(150):no_shrink():child(T(entry[1], "foreground", SIZE.small + 1, 600)))
-					:child(b.div():grow(1):min_w(0):child(P.line(entry[2], "dim", SIZE.small + 1)))
+					:items_center()
+					:justify_between()
+					:gap(10)
+					:min_h(26)
+					:child(T(row[1], "dim", SIZE.small + 1):truncate())
+					:child(keys_cell(row[2]))
 			)
 		end
 	end
@@ -143,86 +268,109 @@ function overlays.help()
 		b.div()
 			:col()
 			:id("help.scroll")
-			:h(math.max(math.min(S.height - 200, 440), 120))
+			:h(math.max(math.min(S.height - 200, 480), 120))
 			:scroll_y(ui:scroll_offset("help.scroll"))
-			:child(scroll)
+			:child(grid)
 	)
-	card:child(
-		T(
-			"Everything the pointer does, the keys do too: rows answer a click, ⌘-click or ⇧-click marks, right-click opens the menu of the row.",
-			"quiet",
-			SIZE.small
-		):truncate()
-	)
-	return b.div()
-		:absolute()
-		:inset(0, 0, 0, 0)
-		:row()
-		:items_center()
-		:justify_center()
-		:bg(alpha("background", 0.6))
-		:press("help:backdrop")
-		:child(card)
+	return over(card, "help:backdrop")
 end
 
 -- What was said for a moment, at the end of the page.
 function overlays.toasts()
-	local stack = b.div():absolute():inset(nil, 16, SIZE.status + 12, nil):col():gap(6):items_end()
+	local stack = b.div()
+		:absolute()
+		:inset(nil, 12, SIZE.status + 10, nil)
+		:col()
+		:gap(8)
+		:w(math.min(340, S.width - 24))
+		:items_stretch()
+	local marks = { success = "circle-check", error = "circle-alert", warning = "triangle-alert", info = "info" }
+	local roles = { success = "success", error = "error", warning = "warning", info = "info" }
 	for index, item in ipairs(S.toasts) do
 		local id = "toast:" .. index
-		local role = item.kind == "info" and "foreground" or item.kind
+		local role = roles[item.kind] or "info"
 		local el = b.div()
 			:press(id)
 			:row()
-			:items_center()
 			:gap(10)
-			:p(10)
+			:items_start()
 			:pl(12)
-			:max_w(480)
-			:rounded(8)
-			:bg("raised3")
-			:border(1, alpha(role, 0.55))
-			:shadow(0, 4, 14, alpha("shadow", 0.45))
-		el:child(b.div():w(3):h(16):rounded(1.5):bg(role):no_shrink())
-		el:child(b.div():min_w(0):child(T(item.text, "foreground", SIZE.small + 1):truncate()))
+			:pr(8)
+			:py(10)
+			:rounded(12)
+			:bg("raised2")
+			:border(1, alpha("border", 0.7))
+			:shadow(0, 6, 18, alpha("shadow", 0.5))
+		el:child(b.div():pt(1):child(P.icon(marks[item.kind] or "info", 15, role)))
+		local text = b.div():col():gap(2):grow(1):min_w(0)
+		text:child(T(item.text, "foreground", SIZE.body, 600):truncate())
+		if item.body then
+			text:child(T(item.body, "dim", SIZE.small + 0.5):truncate())
+		end
+		el:child(text)
+		local actions = b.div():row():items_center():gap(2):mt(-3):no_shrink()
 		if item.action then
-			el:child(
+			actions:child(
 				P.button(
 					"toast.action:" .. index,
 					item.action.label,
-					{ key = index == #S.toasts and "z" or nil, h = 22, px = 8, size = SIZE.small + 0.5 }
+					{ variant = "ghost", size = "sm", disabled = false }
 				)
 			)
 		end
+		actions:child(
+			P.button("toast.x:" .. index, nil, { variant = "ghost", size = "sm", icon = "x", icon_size = 13 })
+		)
+		el:child(actions)
 		stack:child(el)
 	end
 	return stack
 end
 
--- The jobs that are running, as a line of how far each has come.
+-- The jobs, as a list over the status line: what runs and how far it has come, what ended.
 function overlays.jobs()
-	local running = {}
-	for _, job in ipairs(S.jobs) do
-		if job.state == "running" then
-			running[#running + 1] = job
-		end
-	end
-	if #running == 0 then
+	if not S.jobs_open or #S.jobs == 0 then
 		return nil
 	end
-	local strip = b.div():col():gap(4):px(20):py(6):no_shrink():bg("raised1")
-	for _, job in ipairs(running) do
-		local row = b.div():row():items_center():gap(10):h(18)
-		row:child(T(job.title, "foreground", SIZE.small + 0.5, 600):no_shrink())
-		row:child(b.div():w(0):grow(1):min_w(0):child(P.line(job.detail or "", "dim", SIZE.small)))
-		if job.progress then
-			row:child(P.meter(job.progress, "accent", 120))
-		else
-			row:child(T("working…", "dim", SIZE.small):no_shrink())
+	local card = b.div()
+		:col()
+		:p(6)
+		:rounded(12)
+		:bg("raised2")
+		:border(1, alpha("border", 0.7))
+		:shadow(0, 6, 18, alpha("shadow", 0.5))
+		:absolute()
+		:inset(nil, 8, SIZE.status + 6, nil)
+		:w(math.min(340, S.width - 24))
+		:press("overlay:card")
+	local index = 0
+	for position = #S.jobs, 1, -1 do
+		local job = S.jobs[position]
+		index += 1
+		local el = b.div():col():gap(6):p(8)
+		if index > 1 then
+			card:child(b.div():h(1):px(6):bg(alpha("border", 0.4)):no_shrink())
 		end
-		strip:child(row)
+		local role = job.state == "running" and "accent" or (job.state == "done" and "success" or "error")
+		local mark = job.state == "running" and "loader" or (job.state == "done" and "circle-check" or "circle-alert")
+		el:child(
+			b.div()
+				:row()
+				:items_center()
+				:gap(8)
+				:child(P.icon(mark, 13, role))
+				:child(P.line(job.title, "foreground", SIZE.body, 600):grow(1))
+		)
+		if job.state == "running" then
+			el:child(P.meter(job.progress or 0.04, "accent"))
+		end
+		local detail = job.state == "failed" and (job.error or job.detail) or job.detail
+		if detail and detail ~= "" then
+			el:child(P.line(detail, "dim", SIZE.small + 0.5))
+		end
+		card:child(el)
 	end
-	return strip
+	return b.div():absolute():inset(0, 0, 0, 0):press("jobs:backdrop"):child(card)
 end
 
 return {

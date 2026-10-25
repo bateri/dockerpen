@@ -2,17 +2,24 @@ local lib_kit = require("../lib/kit")
 local input_keys = require("./keys")
 local model_act = require("../model/act")
 local model_containers = require("../model/containers")
+local model_dialog = require("../model/dialog")
 local model_disk = require("../model/disk")
 local model_log = require("../model/log")
 local model_nav = require("../model/nav")
+local model_palette = require("../model/palette")
 local model_rows = require("../model/rows")
 local model_state = require("../model/state")
-local ui = lib_kit.ui
+local b, ui = lib_kit.b, lib_kit.ui
 local log_keys = input_keys.log_keys
 local act = model_act.act
 local is_up = model_containers.is_up
+local dialog = model_dialog.dialog
+local palette = model_palette.palette
 local DISK = model_disk.DISK
-local L = model_log.L
+local L, log_wipe = model_log.L, model_log.log_wipe
+local ansi = require("../lib/ansi").ansi
+local fmt = require("../lib/fmt").fmt
+local toast = require("../model/toast").toast
 local ask_clean, ask_pull, cursor_row, go, step =
 	model_nav.ask_clean, model_nav.ask_pull, model_nav.cursor_row, model_nav.go, model_nav.step
 local SORTS, keep_cursor, targets = model_rows.SORTS, model_rows.keep_cursor, model_rows.targets
@@ -44,9 +51,6 @@ function mouse.click(id, mods)
 		elseif section == "images" then
 			if mods.shift or mods.command or mods.control then
 				go.toggle_mark(section, rest)
-			else
-				S.layer_open = rest
-				ui.scroll.list = nil
 			end
 		elseif section == "activity" then
 			local row = cursor_row("activity")
@@ -60,6 +64,93 @@ function mouse.click(id, mods)
 		end
 	elseif kind == "mark" then
 		go.toggle_mark(S.section, rest)
+	elseif kind == "ra" then
+		-- A verb on the row of a container.
+		local verb, target = string.match(rest, "^(%a+):(.*)$")
+		local c = S.by_id[target]
+		if c == nil then
+			return
+		end
+		S.cursor.containers = c.id
+		if verb == "toggle" then
+			act.run(
+				{ c.id },
+				(c.state == "running" or c.state == "restarting") and "stop"
+					or (c.state == "paused" and "unpause" or "start")
+			)
+		elseif verb == "restart" then
+			act.run({ c.id }, "restart")
+		elseif verb == "logs" then
+			go.open(c.id, true)
+			go.tab("logs")
+		elseif verb == "shell" then
+			act.terminal("shell", c)
+		elseif verb == "more" then
+			local rect = b.layout.bounds(id)
+			S.pending_menu = rect and { x = rect.x + rect.w - 216, y = rect.y + rect.h + 4 } or { x = 220, y = 160 }
+		end
+		bump()
+	elseif kind == "ga" then
+		-- A verb on the head of a project: for all of its containers shown.
+		local verb, key = string.match(rest, "^(%a+):(.*)$")
+		S.cursor.containers = "group:" .. key
+		bump()
+		local members = targets("containers")
+		local ids, running = {}, false
+		for _, row in ipairs(members) do
+			running = running or is_up(row.c)
+		end
+		if verb == "restart" then
+			for _, row in ipairs(members) do
+				ids[#ids + 1] = row.id
+			end
+			act.run(ids, "restart")
+		else
+			for _, row in ipairs(members) do
+				if running == is_up(row.c) then
+					ids[#ids + 1] = row.id
+				end
+			end
+			act.run(ids, running and "stop" or "start")
+		end
+	elseif kind == "ev" then
+		local what, seq = string.match(rest, "^(%a+):(.*)$")
+		for _, item in ipairs(S.activity) do
+			if what == "open" and tostring(item.seq) == seq and S.by_id[item.id] then
+				go.section("containers")
+				S.cursor.containers = item.id
+				go.open(item.id, true)
+			end
+		end
+	elseif kind == "part" then
+		S.system_pick = tonumber(rest) or S.system_pick
+		bump()
+	elseif kind == "sorth" then
+		if S.section == "images" then
+			S.image_sort = rest
+		else
+			S.sort = rest
+		end
+		bump()
+	elseif kind == "pf" then
+		S.plain_filter[S.section] = rest
+		S.cache = {}
+		bump()
+		keep_cursor(S.section)
+	elseif kind == "hint" then
+		local run = S.hint_runs and S.hint_runs[tonumber(rest)]
+		if run then
+			run()
+			bump()
+		end
+	elseif id == "jobs" then
+		S.jobs_open = not S.jobs_open
+		bump()
+	elseif id == "cmd" then
+		palette.open()
+	elseif id == "helpbtn" then
+		S.help = true
+		bump()
 	elseif kind == "verb" then
 		if S.section == "containers" and string.sub(rest, 1, 6) == "group:" then
 			S.cursor.containers = rest
@@ -95,7 +186,9 @@ function mouse.click(id, mods)
 		bump()
 		keep_cursor("containers")
 	elseif id == "sort" then
-		S.sort = step(SORTS, S.sort, 1)
+		local rect = b.layout.bounds("sort")
+		S.pending_menu = rect and { x = rect.x, y = rect.y + rect.h + 4, kind = "sort" }
+			or { x = 220, y = 160, kind = "sort" }
 		bump()
 	elseif id == "act:pull" then
 		ask_pull()
@@ -140,6 +233,23 @@ function mouse.click(id, mods)
 			end
 		elseif rest == "time" then
 			L.timestamps = not L.timestamps
+		elseif rest == "wrap" then
+			L.wrap = not L.wrap
+			L.tops = nil
+			L.runs, L.run_count = {}, 0
+		elseif rest == "only" then
+			L.only = not L.only
+			ui:set_scroll("log", 0)
+		elseif rest == "clear" then
+			log_wipe()
+		elseif rest == "copy" then
+			local from = math.max(L.count - 4000 + 1, 1)
+			local lines = {}
+			for index = from, L.count do
+				lines[#lines + 1] = ansi.strip(L.texts[index])
+			end
+			S.copy = table.concat(lines, "\n")
+			toast.say("Copied " .. fmt.count(#lines, "line"), { kind = "success" })
 		elseif rest == "next" then
 			log_keys("n", {})
 		elseif rest == "prev" then
@@ -150,38 +260,46 @@ function mouse.click(id, mods)
 	elseif kind == "env" then
 		S.revealed_env[rest] = (not S.revealed_env[rest]) or nil
 	elseif kind == "layers" then
-		if rest == "back" then
-			S.layer_open = nil
-		elseif rest == "update" then
-			go.update_image(S.layer_open)
-		elseif rest == "remove" then
-			S.cursor.images = S.layer_open
-			S.marks.images = {}
-			act.remove_listed("images")
+		local what, id = string.match(rest, "^(%a+):(.*)$")
+		if what == "toggle" then
+			S.cursor.images = id
+			go.layers(S.layer_open ~= id and id or nil)
 		end
-		bump()
+	elseif kind == "img" then
+		local what, name = string.match(rest, "^(%a+):(.*)$")
+		for _, c in ipairs(S.containers) do
+			if what == "open" and c.name == name then
+				go.section("containers")
+				S.cursor.containers = c.id
+				go.open(c.id, true)
+			end
+		end
 	elseif kind == "free" then
-		for _, one in ipairs(DISK) do
-			if one.target == rest then
-				local part = S.system and S.system.usage[one.key]
-				act.prune({ rest }, { one.title }, part and part.reclaimable or 0)
+		for index, one in ipairs(DISK) do
+			if one.key == rest then
+				S.system_pick = index
+				go.free(index)
 			end
 		end
 	elseif kind == "dialog" then
-		local d = S.dialog
-		if d == nil then
+		local what, index = string.match(rest, "^(%a+):?(%d*)$")
+		if S.dialog == nil then
 			return
+		elseif what == "cancel" or what == "backdrop" then
+			dialog.close()
+		elseif what == "confirm" then
+			dialog.confirm()
+		elseif what == "option" then
+			dialog.toggle(tonumber(index))
+		elseif what == "suggest" then
+			dialog.suggest(dialog.SUGGESTIONS[tonumber(index)])
 		end
-		if rest == "cancel" then
-			S.dialog = nil
-			bump()
-		elseif rest == "confirm" then
-			if d.field and string.gsub(S.query, "%s", "") == "" then
-				return
-			end
-			S.dialog = nil
-			bump()
-			d.run()
+	elseif kind == "palette" then
+		local what, index = string.match(rest, "^(%a+):?(%d*)$")
+		if what == "backdrop" then
+			palette.close()
+		elseif what == "item" then
+			palette.run(tonumber(index))
 		end
 	elseif id == "help:backdrop" then
 		S.help = false
@@ -197,12 +315,30 @@ function mouse.click(id, mods)
 			end
 			bump()
 		end
+	elseif kind == "toast.x" then
+		table.remove(S.toasts, tonumber(rest))
+		bump()
+	elseif kind == "overlay" then
+		return
+	elseif id == "jobs:backdrop" then
+		S.jobs_open = false
+		bump()
+	elseif id == "help:close" then
+		S.help = false
+		bump()
 	elseif kind == "toast.action" then
 		local index = tonumber(rest)
 		local item = S.toasts[index]
 		if item and item.action then
 			table.remove(S.toasts, index)
-			item.action.run()
+			if item.action.open and S.by_id[item.action.open] then
+				go.section("containers")
+				S.cursor.containers = item.action.open
+				go.open(item.action.open, true)
+				go.tab("logs")
+			elseif item.action.run then
+				item.action.run()
+			end
 			bump()
 		end
 	end

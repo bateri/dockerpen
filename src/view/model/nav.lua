@@ -17,7 +17,7 @@ local FILTERS, LOG_TAIL, SECTIONS, SIZE, TABS =
 local reveal = lib_virtual.reveal
 local act, ask = model_act.act, model_act.ask
 local is_up = model_containers.is_up
-local all_that_can_be_freed = model_disk.all_that_can_be_freed
+local DISK = model_disk.DISK
 local on_stats = model_feed.on_stats
 local load_detail, load_list, load_processes, load_system, signature =
 	model_lists.load_detail,
@@ -27,8 +27,14 @@ local load_detail, load_list, load_processes, load_system, signature =
 	model_lists.signature
 local L, log_clear, log_live, on_log = model_log.L, model_log.log_clear, model_log.log_live, model_log.on_log
 local net, why = model_net.net, model_net.why
-local SORTS, folded, index_of, keep_cursor, rows_of =
-	model_rows.SORTS, model_rows.folded, model_rows.index_of, model_rows.keep_cursor, model_rows.rows_of
+local SORTS, SORT_LABELS, folded, index_of, keep_cursor, row_tops, rows_of =
+	model_rows.SORTS,
+	model_rows.SORT_LABELS,
+	model_rows.folded,
+	model_rows.index_of,
+	model_rows.keep_cursor,
+	model_rows.row_tops,
+	model_rows.rows_of
 local S, bump = model_state.S, model_state.bump
 local toast = model_toast.toast
 
@@ -39,6 +45,9 @@ local go = {}
 -- Which part of the page has the host's text field: the filter of a list, the search of a log,
 -- the answer to a question; nothing, where there is nothing to type into.
 local function field_context(g)
+	if S.palette then
+		return "palette"
+	end
 	if S.dialog then
 		return S.dialog.field and "dialog" or nil
 	end
@@ -51,8 +60,6 @@ local function field_context(g)
 		end
 		return "list"
 	elseif S.section == "system" then
-		return nil
-	elseif S.section == "images" and S.layer_open then
 		return nil
 	end
 	return "list"
@@ -73,6 +80,7 @@ local function persist()
 		group = S.group,
 		sort = S.sort,
 		folded = S.folded,
+		folded_known = S.folded_known,
 		cursor = S.cursor,
 		timestamps = L.timestamps,
 	}
@@ -106,8 +114,8 @@ local function restore(kept)
 	if type(kept.group) == "boolean" then
 		S.group = kept.group
 	end
-	if type(kept.folded) == "table" then
-		S.folded = kept.folded
+	if type(kept.folded) == "table" and kept.folded_known == true then
+		S.folded, S.folded_known = kept.folded, true
 	end
 	if type(kept.cursor) == "table" then
 		S.cursor = kept.cursor
@@ -260,7 +268,7 @@ function go.move(section, how)
 		to = math.max(1, math.min(#rows, at + how))
 	end
 	S.cursor[section] = rows[to].id
-	reveal("list", to, #rows, SIZE.row)
+	reveal("list", to, #rows, SIZE.row, nil, row_tops(section))
 	if section == "containers" and S.open and rows[to].kind == "container" then
 		go.open(rows[to].id, false)
 	end
@@ -300,6 +308,25 @@ function go.mark_all(section, on)
 	bump()
 end
 
+-- Frees what nothing uses of one part of the disk (the images, the containers, ...), after asking.
+function go.free(index)
+	local one = DISK[index]
+	if one == nil then
+		return
+	end
+	act.prune(one.targets)
+end
+
+-- Opens the layers of an image under its row (or, with no id, shuts them): they are asked for again.
+function go.layers(id)
+	S.layer_open = id
+	if id then
+		S.layers[id] = nil
+		S.cursor.images = id
+	end
+	bump()
+end
+
 function go.fold(row, to)
 	if row.kind ~= "group" then
 		return
@@ -312,39 +339,39 @@ function go.fold(row, to)
 	bump()
 end
 
-local function ask_pull(reference)
-	ask("Pull an image", {}, "Pull", function()
-		local text = string.gsub(S.query, "^%s*(.-)%s*$", "%1")
-		if text ~= "" then
-			act.pull(text)
-		end
-	end, {
-		field = {
-			label = "Image: a name, or name:tag. ⏎ ends typing, ⏎ again pulls.",
-			hint = "redis, nginx:alpine",
-		},
-	})
+local function ask_pull()
+	act.ask_pull()
 end
 
-local function ask_clean()
-	local targets_, titles, freed = all_that_can_be_freed()
-	if S.system == nil then
-		S.stale.system = true
-		load_system()
-		toast.say("Counting the disk: ask again in a moment", { kind = "info" })
-		return
+-- Opens the clean-up, with what the section on show is about ticked.
+local function ask_clean(preset)
+	if preset == nil then
+		if S.section == "images" then
+			preset = { "dangling_images", "unused_images" }
+		elseif S.section == "volumes" then
+			preset = { "volumes" }
+		elseif S.section == "networks" then
+			preset = { "networks" }
+		end
 	end
-	if #targets_ == 0 then
-		toast.say("There is nothing to clean up", { kind = "info" })
-		return
-	end
-	act.prune(targets_, titles, freed)
+	act.prune(preset)
 end
 
 -- The menu of the row the cursor is on, at `at`.
 local function row_menu(at)
 	local section = S.section
 	local entries, acts = {}, {}
+	if at.kind == "sort" then
+		for _, how in ipairs(SORTS) do
+			entries[#entries + 1] = { title = (S.sort == how and "✓ " or "   ") .. SORT_LABELS[how], enabled = true }
+			acts[#entries] = function()
+				S.sort = how
+				bump()
+			end
+		end
+		S.menu = { acts = acts }
+		return { at = { x = at.x, y = at.y }, entries = entries }
+	end
 	local function item(title, key, enabled, fn)
 		entries[#entries + 1] = { title = title, key = key, enabled = enabled ~= false }
 		acts[#entries] = fn
@@ -392,9 +419,8 @@ local function row_menu(at)
 			return nil
 		end
 		if section == "images" then
-			item("Layers", nil, true, function()
-				S.layer_open = row.id
-				bump()
+			item(S.layer_open == row.id and "Hide layers" or "Show layers", "⏎", true, function()
+				go.layers(S.layer_open ~= row.id and row.id or nil)
 			end)
 			line()
 		end
@@ -405,7 +431,7 @@ local function row_menu(at)
 		return nil
 	end
 	S.menu = { acts = acts }
-	return { at = at, entries = entries }
+	return { at = { x = at.x, y = at.y }, entries = entries }
 end
 
 -- Updates an image: pulls what its first tag names again.

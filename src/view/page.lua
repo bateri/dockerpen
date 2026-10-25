@@ -13,10 +13,12 @@ local model_net = require("./model/net")
 local model_rows = require("./model/rows")
 local model_state = require("./model/state")
 local model_toast = require("./model/toast")
-local parts_frame = require("./parts/frame")
+local parts_palette = require("./parts/palette")
+local parts_rail = require("./parts/rail")
+local parts_status = require("./parts/status")
 local parts_overlays = require("./parts/overlays")
 local screens_logs = require("./screens/logs")
-local b, ui = lib_kit.b, lib_kit.ui
+local alpha, b, ui = lib_kit.alpha, lib_kit.b, lib_kit.ui
 local keys, reply_field, scroll_by = input_keys.keys, input_keys.reply_field, input_keys.scroll_by
 local mouse = input_mouse.mouse
 local fmt = lib_fmt.fmt
@@ -24,14 +26,17 @@ local SIZE = lib_sizes.SIZE
 local reveal, views = lib_virtual.reveal, lib_virtual.views
 local on_containers, on_events, on_jobs = model_feed.on_containers, model_feed.on_events, model_feed.on_jobs
 local load_list, load_system = model_lists.load_list, model_lists.load_system
-local L = model_log.L
+local L, log_total = model_log.L, model_log.log_total
 local field_context, go, persist, restore, row_menu, sync =
 	model_nav.field_context, model_nav.go, model_nav.persist, model_nav.restore, model_nav.row_menu, model_nav.sync
 local net, why = model_net.net, model_net.why
-local index_of, keep_cursor, rows_of = model_rows.index_of, model_rows.keep_cursor, model_rows.rows_of
+local index_of, keep_cursor, row_tops, rows_of =
+	model_rows.index_of, model_rows.keep_cursor, model_rows.row_tops, model_rows.rows_of
 local S, bump, geometry = model_state.S, model_state.bump, model_state.geometry
 local toast = model_toast.toast
-local frame = parts_frame.frame
+local palette_part = parts_palette
+local rail = parts_rail
+local status = parts_status
 local overlays = parts_overlays.overlays
 local scan_log = screens_logs.scan_log
 
@@ -58,20 +63,22 @@ local function main_screen(g)
 	if section == "containers" then
 		local open = S.open and S.by_id[S.open]
 		if open and g.beside then
-			local list_width = g.main - SIZE.detail
+			local detail_width = g.detail
+			local list_width = g.main - detail_width
 			return b.div()
 				:row()
 				:grow(1)
 				:min_w(0)
 				:min_h(0)
 				:child(screens.list(list_width))
-				:child(b.div():col():w(SIZE.detail):no_shrink():child(screens.detail(SIZE.detail, true)))
+				:child(b.div():w(1):bg(alpha("border", 0.6)):no_shrink())
+				:child(b.div():col():w(detail_width):no_shrink():child(screens.detail(detail_width, true)))
 		elseif open then
 			return frame_:child(screens.detail(g.main, false))
 		end
 		return frame_:child(screens.list(g.main))
 	elseif section == "images" then
-		return frame_:child(S.layer_open and screens.layers(g.main) or screens.images(g.main))
+		return frame_:child(screens.images(g.main))
 	elseif section == "volumes" then
 		return frame_:child(screens.volumes(g.main))
 	elseif section == "networks" then
@@ -86,22 +93,25 @@ local function build(g)
 	local root = b.div():size_full()
 	local app = b.div():size_full():col()
 	if g.rail == 0 then
-		app:child(frame.strip())
+		app:child(rail.strip())
 	end
 	local body = b.div():row():grow(1):min_h(0)
 	if g.rail > 0 then
-		body:child(frame.rail())
+		body:child(rail.column(g.compact))
 	end
 	body:child(main_screen(g))
 	app:child(body)
+	app:child(status.bar(S.width))
+	root:child(app)
 	local jobs = overlays.jobs()
 	if jobs then
-		app:child(jobs)
+		root:child(jobs)
 	end
-	app:child(frame.status(S.width))
-	root:child(app)
 	if #S.toasts > 0 then
 		root:child(overlays.toasts())
+	end
+	if S.palette then
+		root:child(palette_part.view())
 	end
 	if S.help then
 		root:child(overlays.help())
@@ -202,7 +212,7 @@ local function render(size, now, reduce_motion)
 		local rows = rows_of(S.section)
 		local at = index_of(rows, S.cursor[S.section])
 		if at then
-			reveal("list", at, #rows, SIZE.row)
+			reveal("list", at, #rows, SIZE.row, nil, row_tops(S.section))
 		end
 	end
 	sync()
@@ -241,7 +251,15 @@ local function on_text(text)
 	S.query = text
 	S.cache = {}
 	bump()
-	if S.field == "list" then
+	if S.dialog and S.dialog.field then
+		-- The name typed to be pulled.
+		S.dialog.reference = text
+	elseif S.palette then
+		-- What is looked for in the palette: the first of what it finds is the one it is on.
+		S.palette.active = 1
+		S.palette.reveal = true
+		ui:set_scroll("palette.list", 0)
+	elseif S.field == "list" then
 		ui.scroll.list = nil
 		keep_cursor(S.section)
 	end
@@ -272,6 +290,10 @@ local function answer(result)
 		reply.menu = row_menu(S.pending_menu)
 		S.pending_menu = nil
 	end
+	if S.want_field then
+		S.want_field, S.typing = nil, true
+		reply.keyboard = "field"
+	end
 	reply.cursor = cursor_shape()
 	persist()
 	sync()
@@ -290,6 +312,9 @@ local function handle(event)
 	elseif kind == "press" then
 		S.pointer = { x = event.x, y = event.y }
 		local hit = ui:press(b.layout, event)
+		if hit ~= "field" and hit ~= "field.room" then
+			S.typing = false
+		end
 		S.press_mods = event.mods
 		result = false
 		if hit == "field" or hit == "field.room" then
@@ -315,13 +340,15 @@ local function handle(event)
 				L.follow = false
 			else
 				local view = views.log or 400
-				if ui:scroll_offset("log") >= L.count * SIZE.line + 8 - view - 2 then
+				if ui:scroll_offset("log") >= log_total() + 8 - view - 2 then
 					L.follow, L.new_since = true, 0
 				end
 			end
 		end
 		result = moved
 	elseif kind == "key" then
+		-- A key that reaches the page is one the host's field did not take: the keyboard is the page's.
+		S.typing = false
 		result = keys.press(event.key, event.mods)
 	elseif kind == "text" then
 		on_text(event.text)

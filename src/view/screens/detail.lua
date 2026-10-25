@@ -56,25 +56,45 @@ local function lines_of_text(content, role, size)
 	return T(content, role, size or SIZE.body):truncate()
 end
 
--- The verbs of one container, as a row of buttons.
+-- The verbs of one container, as a row of buttons with their icons, and the one that removes it at
+-- the end, as an icon of its own.
 local function verbs_row(c, narrow)
 	local up = is_up(c)
 	local busy = S.busy[c.id] ~= nil
-	local function key(letter)
-		return (not narrow) and letter or nil
+	local row = b.div():row():items_center():gap(6):px(14):h(32):no_shrink()
+	local function verb(id, label, name, o)
+		o = o or {}
+		o.size, o.icon = "sm", name
+		return P.button(id, label, o)
 	end
-	local row = b.div():row():items_center():gap(6):px(18):h(34):no_shrink()
-	row:child(P.button("d:toggle", up and "Stop" or "Start", { key = key("s"), disabled = busy, primary = not up }))
-	row:child(P.button("d:restart", "Restart", { key = key("r"), disabled = busy }))
 	row:child(
-		P.button("d:pause", c.state == "paused" and "Resume" or "Pause", { key = key("p"), disabled = busy or not up })
+		verb(
+			"d:toggle",
+			up and "Stop" or (c.state == "paused" and "Resume" or "Start"),
+			up and "square" or "play",
+			{ disabled = busy }
+		)
 	)
-	row:child(P.button("d:shell", "Shell", { key = key("e"), disabled = c.state ~= "running" }))
-	if not narrow then
-		row:child(P.button("d:follow", "Follow log", { key = "F" }))
+	row:child(verb("d:restart", "Restart", "rotate-cw", { disabled = busy }))
+	if up or c.state == "paused" then
+		row:child(
+			verb(
+				"d:pause",
+				c.state == "paused" and "Resume" or "Pause",
+				c.state == "paused" and "play" or "pause",
+				{ disabled = busy }
+			)
+		)
 	end
+	row:child(verb("d:shell", "Shell", "square-terminal", { disabled = c.state ~= "running" }))
 	row:child(b.spacer())
-	row:child(P.button("d:remove", "Remove…", { danger = true, key = key("d"), disabled = busy }))
+	row:child(
+		P.button(
+			"d:remove",
+			nil,
+			{ variant = "danger-ghost", size = "sm", icon = "trash-2", icon_size = 14, disabled = busy }
+		)
+	)
 	return row
 end
 
@@ -82,58 +102,89 @@ end
 local function usage_cards(c, wide)
 	local sample = S.samples[c.short]
 	local series = S.series[c.short] or { cpu = {}, memory = {}, net_in = {}, net_out = {} }
-	local function card(title, value, sub, line, role, ceiling)
-		return P.card()
-			:child(T(string.upper(title), "quiet", SIZE.tiny + 0.5, 600))
-			:child(T(value, "foreground", 18, 650):truncate())
-			:child(T(sub, "dim", SIZE.small):truncate())
-			:child(b.div():h(40):mt(4):child(P.spark(line, role, ceiling)))
+	-- A card: its name with an icon, a value with a word beside it, and a line of readings.
+	local function card(title, mark, value, small, line, role, ceiling)
+		local el = P.card():gap(0)
+		el:child(
+			b.div()
+				:row()
+				:items_center()
+				:gap(6)
+				:h(18)
+				:child(P.icon(mark, 12, "quiet"))
+				:child(T(string.upper(title), "quiet", SIZE.tiny + 0.5, 500))
+		)
+		local head = b.div():row():items_center():gap(5):mt(2):child(T(value, "foreground", 17, 600):truncate())
+		if small and small ~= "" then
+			head:child(T(small, "quiet", SIZE.small):truncate())
+		end
+		el:child(head)
+		if line then
+			el:child(b.div():h(56):mt(8):child(P.spark(line, role, ceiling)))
+		end
+		return el
 	end
 	local running = c.state == "running" and sample ~= nil
+	local waiting = c.state == "running" and "waiting for a reading" or "not running"
+	local cpus = S.engine and S.engine.cpus or 1
 	local cpu = running
 			and card(
 				"CPU",
+				"cpu",
 				fmt.percent(sample.cpu),
-				"of one processor",
+				cpus > 1 and "of one cpu" or "of the cpu",
 				series.cpu,
-				"accent",
-				math.max(100, sample.cpu)
+				"accent"
 			)
-		or card("CPU", "–", c.state == "running" and "waiting for a reading" or "not running", {}, "accent")
+		or card("CPU", "cpu", "–", waiting, {}, "accent")
 	local limit = sample and sample.memory_limit or 0
+	local host = S.engine and S.engine.memory or 0
+	local limited = limit > 0 and (host == 0 or limit < host * 0.95)
 	local memory = running
 			and card(
 				"Memory",
-				fmt.bytes(sample.memory),
-				limit > 0 and (string.format("%.1f%%", sample.memory / limit * 100) .. " of " .. fmt.bytes(limit))
-					or "no limit",
+				"memory-stick",
+				fmt.memory(sample.memory),
+				limited and ("of " .. fmt.memory(limit)) or "",
 				series.memory,
-				"info",
-				limit > 0 and limit or nil
+				"success",
+				limited and limit or nil
 			)
-		or card("Memory", "–", c.state == "running" and "waiting for a reading" or "not running", {}, "info")
-	local network = running
-			and card(
-				"Network",
-				"↓ " .. fmt.rate(sample.net_in),
-				"↑ " .. fmt.rate(sample.net_out),
-				series.net_in,
-				"success"
-			)
-		or card("Network", "–", "", {}, "success")
-	local disk = running
-			and card(
-				"Disk · processes",
-				"r " .. fmt.rate(sample.disk_read),
-				"w " .. fmt.rate(sample.disk_write) .. " · " .. sample.pids .. " procs",
-				{},
-				"warning"
-			)
-		or card("Disk · processes", "–", "", {}, "warning")
+		or card("Memory", "memory-stick", "–", waiting, {}, "success")
+	local network
+	if running then
+		network = card("Network", "network", "", nil, series.net_in, "warning")
+		local head = b.div():row():items_center():gap(10):mt(2)
+		head:child(T("↓ " .. fmt.rate(sample.net_in), "info", 15, 600))
+		head:child(T("↑ " .. fmt.rate(sample.net_out), "warning", 15, 600))
+		-- The value row of the card is empty: this one is its own.
+		network.kids[2] = head
+	else
+		network = card("Network", "network", "–", waiting, {}, "warning")
+	end
+	local disk = card("Disk and processes", "hard-drive", "", nil, nil, "warning")
+	if running then
+		local function kv(label, value)
+			return b.div()
+				:row()
+				:items_center()
+				:h(20)
+				:child(b.div():w(80):no_shrink():child(T(label, "quiet", SIZE.small + 0.5)))
+				:child(T(value, "foreground", SIZE.body))
+		end
+		disk.kids[2] = b.div()
+			:col()
+			:mt(4)
+			:child(kv("read", fmt.rate(sample.disk_read)))
+			:child(kv("write", fmt.rate(sample.disk_write)))
+			:child(kv("processes", tostring(sample.pids)))
+	else
+		disk.kids[2] = b.div():mt(2):child(T("–", "foreground", 17, 600))
+	end
 	local grid = b.div():col():gap(8):no_shrink()
 	if wide then
-		local function half(card)
-			return b.div():col():w(0):grow(1):min_w(0):child(card)
+		local function half(el)
+			return b.div():col():w(0):grow(1):min_w(0):child(el)
 		end
 		grid:child(b.div():row():gap(8):child(half(cpu)):child(half(memory)))
 		grid:child(b.div():row():gap(8):child(half(network)):child(half(disk)))
@@ -263,7 +314,7 @@ local function overview(c, w)
 		body:child(
 			P.fact(
 				"limits",
-				(data.memory_limit > 0 and (fmt.bytes(data.memory_limit) .. " memory") or "")
+				(data.memory_limit > 0 and (fmt.memory(data.memory_limit) .. " memory") or "")
 					.. (data.memory_limit > 0 and data.cpu_limit > 0 and " · " or "")
 					.. (data.cpu_limit > 0 and (data.cpu_limit .. " cpus") or "")
 			)
@@ -489,25 +540,33 @@ function screens.detail(width, beside)
 	end
 	local word, role = state_of(c)
 	local panel = b.div():col():grow(1):min_w(0):min_h(0)
-	if beside then
-		panel:bg("raised1"):border(1, alpha("border", 0.7))
-	end
-	local head = b.div():row():items_center():gap(10):h(46):px(18):no_shrink()
-	head:child(P.state_dot(c))
-	head:child(b.div():grow(1):min_w(0):child(P.line(c.name, "foreground", 16, 650)))
-	head:child(P.tag(word, role))
-	head:child(P.button("d:close", beside and "Close" or "Back", { key = "Esc", h = 24, size = SIZE.small + 0.5 }))
+	local head = b.div():row():items_center():gap(8):h(40):pl(12):pr(10):pt(4):no_shrink()
+	head:child(P.dot(c))
+	head:child(b.div():grow(1):min_w(0):child(P.line(c.name, "foreground", 14, 650)))
+	head:child(P.button("d:close", nil, { variant = "ghost", size = "sm", icon = "x", icon_size = 14 }))
 	panel:child(head)
-	local sub = {}
-	sub[#sub + 1] = c.image
-	sub[#sub + 1] = c.short
+	local sub = b.div():row():items_center():gap(8):px(14):h(24):no_shrink():clip()
+	sub:child(P.tag(word, role ~= "dim" and role or nil))
+	sub:child(T(fmt.image_name(c.image), "dim", SIZE.small + 1):no_shrink())
+	sub:child(
+		b.div()
+			:row()
+			:items_center()
+			:gap(5)
+			:press("d:copyid")
+			:no_shrink()
+			:child(T(c.short, hovered("d:copyid") and "foreground" or "dim", SIZE.small + 1))
+			:child(P.icon("copy", 12, hovered("d:copyid") and "foreground" or "quiet"))
+	)
 	if c.project then
-		sub[#sub + 1] = c.project .. (c.service and (" / " .. c.service) or "")
+		sub:child(
+			T(c.project .. (c.service and (" / " .. c.service) or ""), "quiet", SIZE.small + 1):truncate():min_w(0)
+		)
 	end
-	panel:child(b.div():px(18):h(18):no_shrink():child(P.line(table.concat(sub, "  ·  "), "dim", SIZE.small + 0.5)))
-	panel:child(b.div():h(6):no_shrink())
+	panel:child(sub)
+	panel:child(b.div():h(8):no_shrink())
 	panel:child(verbs_row(c, width < 560))
-	panel:child(b.div():h(6):no_shrink())
+	panel:child(b.div():h(8):no_shrink())
 	panel:child(P.tabs(TABS, S.tab, "tab:"))
 	panel:child(b.div():h(1):bg(alpha("border", 0.6)):no_shrink())
 	if S.tab == "logs" then
