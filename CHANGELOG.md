@@ -7,6 +7,12 @@ change what the previous one did.
 
 ## [Unreleased]
 
+### Changed
+
+- dockerpen's page is held to pencere kit 2.0: the gate builds the `pencere` command from the
+  same pencere commit as its stand-in terminal and prelude, and the Lua test host offers the drag
+  queries the 2.0 prelude asks for.
+
 ## [0.4.0] - 2026-10-26
 
 ### Fixed

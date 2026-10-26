@@ -3,10 +3,11 @@
 # pane by pencere's stand-in terminal with a stand-in docker, and the installer's tests), on Linux
 # and macOS.
 #
-# The program is built by the released `pencere` command of tools/pencere-version, as a release
-# is. The stand-in terminal has no release, and the page's tests run against the kit's prelude, so
-# both come from a checkout of pencere at PENCERE_REF: moving that commit is a change of this file,
-# and of dockerpen's page when the kit moved.
+# The `pencere` command, the stand-in terminal and the kit's prelude the page's tests run against
+# all come from a checkout of pencere at PENCERE_REF, so the gate holds dockerpen to the kit it is
+# written for (2.0), which no release of the command offers yet: moving that commit is a change of
+# this file, and of dockerpen's page when the kit moved. A release is still built by the released
+# command of tools/pencere-version (release.yml), which fetches the runner of each target.
 name: check
 
 on:
@@ -18,8 +19,8 @@ permissions:
   contents: read
 
 env:
-  # The commit of pencere the stand-in terminal and the kit's page API are taken from.
-  PENCERE_REF: 1afcfef6175a4bcbcd675ea04c5940fc894ea07a
+  # The commit of pencere the command, the stand-in terminal and the kit's page API are taken from.
+  PENCERE_REF: b5342c053d5c23080274cc3fa515e2df818d8969
 
 jobs:
   check:
@@ -38,20 +39,16 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      - name: Install the pencere command
-        run: |
-          PENCERE_VERSION="$(cat tools/pencere-version)" PENCERE_INSTALL="$RUNNER_TEMP/pencere" \
-            sh -c "$(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/bateri/pencere/main/cli/install.sh)"
-      - name: Build the stand-in terminal from pencere
+      - name: Build the pencere command and the stand-in terminal from pencere
         working-directory: pencere
-        run: cargo build -p pencere-fake-host
+        run: cargo build -p pencere-cli -p pencere-fake-host
       - name: Install StyLua
         run: cargo install stylua --locked --features luau --version 2.6.0 --root "$RUNNER_TEMP/stylua"
       - name: make check
         run: |
           export PATH="$RUNNER_TEMP/stylua/bin:$PATH"
           make check \
-            PENCERE="$RUNNER_TEMP/pencere/pencere" \
+            PENCERE=pencere/target/debug/pencere \
             FAKE_HOST=pencere/target/debug/pencere-fake-host \
             PRELUDE=pencere/kit/luau/prelude
       - name: Say what the runner was built from
@@ -59,5 +56,5 @@ jobs:
           {
             echo "### What this run was held to"
             echo
-            echo "The \`pencere\` command $(cat tools/pencere-version), as released; pencere at \`$PENCERE_REF\`: its \`pencere-fake-host\` and the prelude of its kit (\`kit/luau/prelude\`) that the page's tests run the page against."
+            echo "pencere at \`$PENCERE_REF\`: its \`pencere\` command, its \`pencere-fake-host\` and the prelude of its kit (\`kit/luau/prelude\`) that the page's tests run the page against."
           } >> "$GITHUB_STEP_SUMMARY"
