@@ -18,7 +18,7 @@ local unix_now = model_containers.unix_now
 local PANEL, marked, plain_rows, row_tops =
 	model_rows.PANEL, model_rows.marked, model_rows.plain_rows, model_rows.row_tops
 local S = model_state.S
-local P, T, hover_glow, lit, toward = parts_ui.P, parts_ui.T, parts_ui.hover_glow, parts_ui.lit, parts_ui.toward
+local P, T, blend, hover_glow = parts_ui.P, parts_ui.T, parts_ui.blend, parts_ui.hover_glow
 
 local screens = {}
 
@@ -130,12 +130,15 @@ local function layers_panel(image, width)
 			local id = "img:open:" .. name
 			local level = hover_glow(id)
 			used:child(
-				toward(
-					b.div():row():items_center():h(22):px(8):rounded(11):press(id):bg("raised2"),
-					level,
-					"raised3",
-					11
-				):child(T(name, lit(level) and "foreground" or "dim", SIZE.small))
+				b.div()
+					:row()
+					:items_center()
+					:h(22)
+					:px(8)
+					:rounded(11)
+					:press(id)
+					:bg(blend("raised2", "raised3", level))
+					:child(T(name, blend("dim", "foreground", level), SIZE.small))
 			)
 		end
 		body:child(used)

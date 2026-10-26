@@ -11,8 +11,8 @@ local SIZE = lib_sizes.SIZE
 local dialog = model_dialog.dialog
 local S = model_state.S
 local fmt = require("../lib/fmt").fmt
-local P, T, glow, hover_glow, hovered, lit, toward =
-	parts_ui.P, parts_ui.T, parts_ui.glow, parts_ui.hover_glow, parts_ui.hovered, parts_ui.lit, parts_ui.toward
+local P, T, blend, glow, hover_glow, hovered =
+	parts_ui.P, parts_ui.T, parts_ui.blend, parts_ui.glow, parts_ui.hover_glow, parts_ui.hovered
 
 local overlays = {}
 
@@ -59,12 +59,10 @@ local function option_row(d, index, option)
 	local on = d.values[option.key]
 	local id = "dialog:option:" .. index
 	local row = b.div():row():items_start():gap(10):px(10):py(9):rounded(8):press(id):no_shrink()
-	row:bg("raised1")
-	local framed = d.cursor == index and #d.options > 1
-	if framed then
+	row:bg(blend("raised1", "raised2", hover_glow(id)))
+	if d.cursor == index and #d.options > 1 then
 		row:border(1, alpha("accent", 0.5))
 	end
-	toward(row, hover_glow(id), "raised2", 8, framed and 1 or 0)
 	row:child(b.div():pt(1):child(P.check(on)))
 	local main = b.div():col():grow(1):min_w(0):child(T(option.label, "foreground", SIZE.body))
 	if option.hint then
@@ -128,9 +126,11 @@ function overlays.dialog()
 			if name == text then
 				chip:bg(alpha("accent", 0.2))
 			else
-				toward(chip:bg("raised2"), level, "raised3", 11)
+				chip:bg(blend("raised2", "raised3", level))
 			end
-			chips:child(chip:child(T(name, (name == text or lit(level)) and "foreground" or "dim", SIZE.small)))
+			chips:child(
+				chip:child(T(name, name == text and "foreground" or blend("dim", "foreground", level), SIZE.small))
+			)
 		end
 		card:child(chips)
 	end

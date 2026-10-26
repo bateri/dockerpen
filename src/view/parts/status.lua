@@ -15,7 +15,7 @@ local SIZE = lib_sizes.SIZE
 local act = model_act.act
 local marked, targets = model_rows.marked, model_rows.targets
 local S = model_state.S
-local P, T, hover_glow, lit = parts_ui.P, parts_ui.T, parts_ui.hover_glow, parts_ui.lit
+local P, T, blend, hover_glow = parts_ui.P, parts_ui.T, parts_ui.blend, parts_ui.hover_glow
 
 local status = {}
 
@@ -120,7 +120,6 @@ end
 -- A key and what it does, as a small button where it is something to press.
 local function hint(entry, id)
 	local level = id ~= nil and hover_glow(id) or 0
-	local over = lit(level)
 	local el = b.div():row():items_center():gap(5):h(20):px(4):rounded(4):no_shrink()
 	if id then
 		el:press(id)
@@ -130,7 +129,7 @@ local function hint(entry, id)
 	end
 	el:child(P.kbd(entry.keys, SIZE.tiny, 16))
 	if entry.label ~= "" then
-		el:child(T(entry.label, over and "foreground" or "quiet", SIZE.small))
+		el:child(T(entry.label, blend("quiet", "foreground", level), SIZE.small))
 	end
 	return el
 end

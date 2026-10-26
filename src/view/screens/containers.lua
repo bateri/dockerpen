@@ -18,8 +18,8 @@ local display_name, has_issue, is_up, state_of =
 	model_containers.display_name, model_containers.has_issue, model_containers.is_up, model_containers.state_of
 local container_rows, counts, row_tops = model_rows.container_rows, model_rows.counts, model_rows.row_tops
 local S = model_state.S
-local P, T, chosen, glow, hover_glow, hovered, lit =
-	parts_ui.P, parts_ui.T, parts_ui.chosen, parts_ui.glow, parts_ui.hover_glow, parts_ui.hovered, parts_ui.lit
+local P, T, blend, chosen, glow, hover_glow, hovered =
+	parts_ui.P, parts_ui.T, parts_ui.blend, parts_ui.chosen, parts_ui.glow, parts_ui.hover_glow, parts_ui.hovered
 
 local screens = {}
 
@@ -59,11 +59,11 @@ local function head_cell(label, how, align)
 		cell:justify_end()
 	end
 	local active = how ~= nil and S.sort == how
-	local over = how ~= nil and lit(hover_glow("sorth:" .. how))
+	local level = how ~= nil and hover_glow("sorth:" .. how) or 0
 	if how then
 		cell:press("sorth:" .. how)
 	end
-	cell:child(T(label, (active or over) and "dim" or "quiet", SIZE.tiny + 0.5):truncate())
+	cell:child(T(label, active and "dim" or blend("quiet", "dim", level), SIZE.tiny + 0.5):truncate())
 	if active then
 		cell:child(P.icon("chevron-down", 11, "dim"))
 	end

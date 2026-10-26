@@ -750,6 +750,77 @@ t.test("a button's ground comes up under the pointer and goes", function()
 	t.eq(ground(), 0, "gone")
 end)
 
+t.test("the keys the field gives the page leave it, and in the palette the arrows choose", function()
+	local k = opened()
+	local reply = k:key(":")
+	t.eq(reply.keyboard, { field = "field.room" }, "the palette asks for the field by its name")
+	k:render(1300, 760, 102)
+	t.ok(kit.named(k.root, "field.room"), "the room of the field is named")
+	k:text("con")
+	k:render(1300, 760, 103)
+	-- While the words are in the field, the arrows move the palette and the keyboard stays.
+	reply = k:key("down")
+	t.eq(reply.keyboard, nil)
+	-- Esc leaves the field for the page, without closing the palette.
+	reply = k:key("escape")
+	t.eq(reply.keyboard, "page")
+	k:render(1300, 760, 104)
+	t.has(page_texts(k), "close", "the palette's foot says Esc closes it now")
+	-- The person clicks into the field again: the page is told, and the palette's foot follows.
+	k:event({ type = "focus", field = "field.room" })
+	k:render(1300, 760, 105)
+	t.has(page_texts(k), "to the list")
+end)
+
+t.test("a button that is an icon alone says what it does to a screen reader", function()
+	local k = opened()
+	k:key("down")
+	k:render(1300, 760, 102)
+	local labels = {}
+	local function walk(element)
+		if element.meta and element.meta.label then
+			labels[#labels + 1] = element.meta.label
+		end
+		for _, child in ipairs(element.kids or {}) do
+			walk(child)
+		end
+	end
+	walk(k.root)
+	t.has(labels, "Restart")
+	t.has(labels, "More")
+end)
+
+t.test("the line between the list and a container is dragged to make the container wider", function()
+	local k = opened()
+	k:key("down")
+	k:key("enter")
+	k:render(1300, 760, 102)
+	t.ok(kit.find(k.root, "split"), "the line is there")
+	k.hit_id = "split"
+	local over = k:event({ type = "move", x = 700, y = 300 })
+	t.eq(over.cursor, "resize_horizontal", "the pointer says it can be dragged")
+	k:event({ type = "press", x = 700, y = 300, button = "left", mods = {} })
+	local dragged = k:event({ type = "move", x = 600, y = 300 })
+	t.eq(dragged.redraw, true)
+	k:event({ type = "release", x = 600, y = 300, button = "left" })
+	k.hit_id = nil
+	k:render(1300, 760, 103)
+	-- The container's side is what is right of where the line was let go.
+	local found = false
+	local function walk(element)
+		for index, child in ipairs(element.kids or {}) do
+			if child.meta and child.meta.id == "split" then
+				local next_one = element.kids[index + 1]
+				t.eq(next_one.style.width, 700, "1300 points less the 600 left of the line")
+				found = true
+			end
+			walk(child)
+		end
+	end
+	walk(k.root)
+	t.ok(found)
+end)
+
 t.test("a list the program could not make says why", function()
 	local k = opened()
 	k:key("2")

@@ -14,7 +14,7 @@ local virtual = lib_virtual.virtual
 local ago, container, is_up, state_of =
 	model_containers.ago, model_containers.container, model_containers.is_up, model_containers.state_of
 local S = model_state.S
-local P, T, hover_glow, lit = parts_ui.P, parts_ui.T, parts_ui.hover_glow, parts_ui.lit
+local P, T, blend, hover_glow = parts_ui.P, parts_ui.T, parts_ui.blend, parts_ui.hover_glow
 local log_tab = screens_logs.log_tab
 
 local screens = {}
@@ -715,12 +715,9 @@ local function detail_tabs(current)
 				:h(34)
 				:no_shrink()
 				:child(
-					b.div()
-						:grow(1)
-						:row()
-						:items_center()
-						:px(9)
-						:child(T(tab.label, (active or lit(hover_glow(id))) and "foreground" or "dim", SIZE.body))
+					b.div():grow(1):row():items_center():px(9):child(
+						T(tab.label, active and "foreground" or blend("dim", "foreground", hover_glow(id)), SIZE.body)
+					)
 				)
 				:child(b.div():h(2):ml(6):mr(6):rounded_corners({ 2, 2, 0, 0 }):bg(active and "accent" or nil))
 		)
@@ -743,7 +740,7 @@ function screens.detail(width, beside)
 	local sub = b.div():row():items_center():gap(8):px(14):h(24):no_shrink():clip()
 	sub:child(P.tag(word, role ~= "dim" and role or nil))
 	sub:child(T(fmt.image_name(c.image), "dim", SIZE.small + 0.5):truncate():min_w(0))
-	local copy_lit = lit(hover_glow("d:copyid"))
+	local copy_level = hover_glow("d:copyid")
 	sub:child(
 		b.div()
 			:row()
@@ -751,8 +748,8 @@ function screens.detail(width, beside)
 			:gap(5)
 			:press("d:copyid")
 			:no_shrink()
-			:child(T(c.short, copy_lit and "foreground" or "dim", SIZE.small))
-			:child(P.icon("copy", 11, copy_lit and "foreground" or "quiet"))
+			:child(T(c.short, blend("dim", "foreground", copy_level), SIZE.small))
+			:child(P.icon("copy", 11, blend("quiet", "foreground", copy_level)))
 	)
 	if c.project then
 		sub:child(

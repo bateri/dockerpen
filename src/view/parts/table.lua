@@ -8,7 +8,7 @@ local parts_ui = require("./ui")
 local alpha, b = lib_kit.alpha, lib_kit.b
 local SIZE = lib_sizes.SIZE
 local S = model_state.S
-local P, T, chosen, hover_glow, lit = parts_ui.P, parts_ui.T, parts_ui.chosen, parts_ui.hover_glow, parts_ui.lit
+local P, T, blend, chosen, hover_glow = parts_ui.P, parts_ui.T, parts_ui.blend, parts_ui.chosen, parts_ui.hover_glow
 
 local table_part = {}
 
@@ -30,7 +30,7 @@ function table_part.head(tracks, columns, sorted)
 		cell:child(
 			T(
 				string.upper(column.label),
-				(active or (id and lit(hover_glow(id)))) and "dim" or "quiet",
+				active and "dim" or (id and blend("quiet", "dim", hover_glow(id)) or "quiet"),
 				SIZE.tiny + 0.5,
 				500
 			):truncate()
@@ -65,7 +65,7 @@ function table_part.lead(row_id, marked_on, mark, name)
 	end
 	if name == "chevron-right" or name == "chevron-down" then
 		return cell:press("layers:toggle:" .. row_id)
-			:child(P.icon(name, 13, lit(hover_glow("layers:toggle:" .. row_id)) and "foreground" or "quiet"))
+			:child(P.icon(name, 13, blend("quiet", "foreground", hover_glow("layers:toggle:" .. row_id))))
 	end
 	return cell:child(P.icon(name, 13, "quiet"))
 end

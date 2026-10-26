@@ -16,6 +16,12 @@ change what the previous one did.
   native page: the rail's sections, buttons, tabs, the filters, rows of every list, the palette,
   the keys at the bottom and the choices of a dialog. The pill under the section on show slides to
   the one chosen. Under Reduce Motion nothing moves.
+- Words that brighten under the pointer do so as smoothly as their ground, and the page is as large
+  as your terminal's text (with ⌘+ and ⌘− in bateri).
+- The line between the list and a container's detail can be dragged to make either wider.
+- In the palette, ↑ and ↓ choose while what you typed stays in the field; ⏎, Esc and ⇥ leave the
+  field as before.
+- A screen reader reads the buttons that are an icon alone by what they do (Restart, Logs, More…).
 
 ## [0.3.0] - 2026-10-25
 

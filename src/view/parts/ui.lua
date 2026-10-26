@@ -15,6 +15,28 @@ local S = model_state.S
 
 local P = {}
 
+-- The name of the host's text field: one at a time on the page, the room of whichever box is the
+-- field now (the list's filter, the palette, a question's name), so that what was typed stays as the
+-- room moves.
+local FIELD = "field.room"
+
+-- What a button that is an icon alone is to a screen reader, by its icon.
+local ICON_WORDS = {
+	x = "Close",
+	ellipsis = "More",
+	["rotate-cw"] = "Restart",
+	["scroll-text"] = "Logs",
+	["square-terminal"] = "Shell",
+	play = "Start",
+	square = "Stop",
+	eraser = "Clear",
+	copy = "Copy",
+	["arrow-right-left"] = "Follow",
+	["arrow-down-wide-narrow"] = "Sort",
+	trash = "Remove",
+	["trash-2"] = "Remove",
+}
+
 -- The longest line of text the page makes (the kit takes 64 KiB, and ends a page that makes more).
 local LINE_MOST = 4000
 
@@ -64,28 +86,15 @@ local function hover_glow(id)
 	return glow(id, ui.hover == id)
 end
 
--- Whether a highlight is far enough in for words and icons to take the brighter colour: half way,
--- where its ground is (a role cannot be part one colour and part another).
-local function lit(level)
-	return level >= 0.5
-end
-
--- `el`'s ground on its way from what it is to `colour`, as far as `level`: a layer of `colour` at
--- that opacity under what it holds (so it is to be the first of its children), in its corners
--- (`radius`, el's own). An element with a border says how wide (`edge`): the layer stays inside it,
--- as a placed child covers its parent's whole box, border and all.
-local function toward(el, level, colour, radius, edge)
-	edge = edge or 0
-	if level > 0 then
-		el:child(
-			b.div()
-				:absolute()
-				:inset(edge, edge, edge, edge)
-				:rounded(math.max((radius or 0) - edge, 0))
-				:bg(alpha(colour, level))
-		)
+-- A colour on its way from `from` to `to`, as far as `level` (0 to 1): a ground a highlight comes
+-- in on, `dim` words that brighten to `foreground` with it.
+local function blend(from, to, level)
+	if level <= 0 then
+		return from
+	elseif level >= 1 then
+		return to
 	end
-	return el
+	return b.mix(from, to, level)
 end
 
 -- What is chosen: the accent at an eighth, with a line of it round (`strong`: the keys are here).
@@ -130,6 +139,10 @@ function P.button(id, label, o)
 	local el = b.div():row():items_center():justify_center():gap(small and 5 or 6):h(height):rounded(6):no_shrink()
 	if label == nil then
 		el:w(height)
+		-- Its icon alone says nothing to a person who does not see it.
+		if o.icon then
+			el:label(o.label or ICON_WORDS[o.icon] or string.gsub(o.icon, "-", " "))
+		end
 	else
 		el:px(o.px or (small and 8 or 10))
 	end
@@ -153,13 +166,10 @@ function P.button(id, label, o)
 			ink = "error"
 			el:bg(down and alpha("error", 0.2) or (level > 0 and alpha("error", 0.12 * level) or nil))
 		elseif variant == "ghost" then
-			ink = lit(level) and "foreground" or "dim"
+			ink = blend("dim", "foreground", level)
 			el:bg(down and alpha("foreground", 0.1) or (level > 0 and alpha("foreground", 0.06 * level) or nil))
 		else
-			el:bg(down and "raised4" or "raised2"):border(1, alpha("border", 0.6))
-			if not down then
-				toward(el, level, "raised3", 6, 1)
-			end
+			el:bg(down and "raised4" or blend("raised2", "raised3", level)):border(1, alpha("border", 0.6))
 		end
 	end
 	if o.ink and not o.disabled then
@@ -466,7 +476,7 @@ end
 
 -- The room of the host's text field, `height` tall, that says `hint` while it is empty.
 function P.room(height, hint)
-	return b.div():id("field.room"):text_field():grow(1):min_w(0):h(height):child(T(hint, "quiet", SIZE.body))
+	return b.div():text_field(FIELD):grow(1):min_w(0):h(height):child(T(hint, "quiet", SIZE.body))
 end
 
 -- The mark of a row that can be chosen with space: filled when it is.
@@ -493,7 +503,7 @@ function P.segmented(prefix, options, current, seg_px)
 		elseif level > 0 then
 			seg:bg(alpha("foreground", 0.05 * level))
 		end
-		seg:child(T(option.label, (active or lit(level)) and "foreground" or "dim", SIZE.body))
+		seg:child(T(option.label, active and "foreground" or blend("dim", "foreground", level), SIZE.body))
 		if option.count ~= nil then
 			local role = option.tone and option.count > 0 and option.tone or (active and "dim" or "quiet")
 			seg:child(T(tostring(option.count), role, SIZE.tiny + 0.5))
@@ -506,7 +516,6 @@ end
 -- A switch with its word: on or off.
 function P.switch(id, label, on)
 	local level = hover_glow(id)
-	local over = lit(level)
 	local track = b.div():w(26):h(14):rounded(7):no_shrink():row():items_center():px(2)
 	track:bg(on and "accent" or alpha("foreground", 0.16 + 0.06 * level))
 	if on then
@@ -522,7 +531,7 @@ function P.switch(id, label, on)
 		:press(id)
 		:no_shrink()
 		:child(track)
-		:child(T(label, over and "foreground" or "dim", SIZE.body))
+		:child(T(label, blend("dim", "foreground", level), SIZE.body))
 end
 
 -- The bars that stand for the containers of a project, one each (the first twelve), in the colour
@@ -602,13 +611,13 @@ function P.line(content, role, size, weight)
 end
 
 return {
+	FIELD = FIELD,
 	LINE_MOST = LINE_MOST,
 	P = P,
 	T = T,
 	chosen = chosen,
+	blend = blend,
 	glow = glow,
 	hover_glow = hover_glow,
 	hovered = hovered,
-	lit = lit,
-	toward = toward,
 }
