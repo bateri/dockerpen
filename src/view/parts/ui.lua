@@ -35,6 +35,22 @@ local ICON_WORDS = {
 	["arrow-down-wide-narrow"] = "Sort",
 	trash = "Remove",
 	["trash-2"] = "Remove",
+	["folder-tree"] = "Group by compose project",
+	download = "Pull an image",
+	sparkles = "Remove what nothing uses",
+}
+
+-- What a button that is an icon alone says while the pointer rests on it, beyond its words, and
+-- the key that does the same, as the web page's tips did.
+local ICON_TIPS = {
+	x = { "Close", "esc" },
+	ellipsis = { "More", "." },
+	["rotate-cw"] = { "Restart", "r" },
+	["scroll-text"] = { "Logs", "l" },
+	["square-terminal"] = { "Shell, in the terminal", "e" },
+	["arrow-right-left"] = { "Follow in the terminal, with nothing in between", "F" },
+	["folder-tree"] = { "Group by compose project", "P" },
+	eraser = { "Clear the view (the container's log stays)" },
 }
 
 -- The longest line of text the page makes (the kit takes 64 KiB, and ends a page that makes more).
@@ -141,7 +157,10 @@ function P.button(id, label, o)
 		el:w(height)
 		-- Its icon alone says nothing to a person who does not see it.
 		if o.icon then
-			el:label(o.label or ICON_WORDS[o.icon] or string.gsub(o.icon, "-", " "))
+			local words = o.label or ICON_WORDS[o.icon] or string.gsub(o.icon, "-", " ")
+			el:label(words)
+			local said = ICON_TIPS[o.icon]
+			el:tip(o.tip or (said and said[1]) or words, o.keys or (said and said[2]))
 		end
 	else
 		el:px(o.px or (small and 8 or 10))
@@ -450,8 +469,8 @@ end
 function P.field(active, hint, width, min, wide)
 	-- While the keyboard is in it the box comes forward, as the web page's did over a fifth of a second:
 	-- the page's ground, the accent's line and a soft ring of it round the box, and (where `wide` says)
-	-- more room, eased in.
-	local level = glow("field.focus:" .. hint, active and S.typing)
+	-- more room. The host moves it there and back.
+	local on = active and S.typing
 	local box = b.div()
 		:row()
 		:items_center()
@@ -460,19 +479,25 @@ function P.field(active, hint, width, min, wide)
 		:pl(8)
 		:pr(5)
 		:rounded(6)
-		:bg(blend("raised1", "background", level))
-		:border(1, alpha(blend("border", "accent", level), 0.6 + 0.4 * level))
+		:bg(on and "background" or "raised1")
+		:border(1, on and "accent" or alpha("border", 0.6))
 		:press("field")
+		:motion({ seconds = 0.2, color = true, size = true })
 	if width then
-		local eased = 1 - (1 - level) ^ 3
-		box:w(wide and math.floor(width + (wide - width) * eased) or width):min_w(min or 120)
+		box:w(on and wide or width):min_w(min or 120)
 	else
 		box:grow(1):min_w(min or 120)
 	end
-	if level > 0 then
-		-- The ring: three points outside the box, the accent at a little under a fifth.
-		box:child(b.div():absolute():inset(-3, -3, -3, -3):rounded(9):border(3, alpha("accent", 0.18 * level)))
-	end
+	-- The ring: three points outside the box, the accent at a little under a fifth.
+	box:child(
+		b.div()
+			:id("field.ring")
+			:absolute()
+			:inset(-3, -3, -3, -3)
+			:rounded(9)
+			:border(3, alpha("accent", on and 0.18 or 0))
+			:motion({ seconds = 0.2, color = true })
+	)
 	box:child(icon("search", 14, "quiet"))
 	if active then
 		box:child(P.room(18, hint))

@@ -115,6 +115,8 @@ local function item(section, compact)
 	local id = "sec:" .. section.id
 	local active = S.section == section.id
 	local el = b.div():press(id):row():items_center():gap(10):h(ITEM):rounded(6):no_shrink()
+	-- Its name and its key while the pointer rests on it, as the web page's tip said them.
+	el:tip(section.label, section.key)
 	if compact then
 		el:justify_center()
 	else

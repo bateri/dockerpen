@@ -212,6 +212,16 @@ local function row_verbs(c, up)
 	return row
 end
 
+-- How a row of the list moves, as the web page's did: to its new place when the rows around it
+-- change (a group opened or closed, the list sorted again), in from a little below when it comes,
+-- out a little upward when it goes. The host moves it.
+local ROW_MOTION = {
+	seconds = 0.3,
+	place = true,
+	enter = { opacity = 0, dy = 6, seconds = 0.28 },
+	exit = { opacity = 0, dy = -3, seconds = 0.14 },
+}
+
 -- One container of the list.
 local function container_row(row, l, peak)
 	local c = row.c
@@ -225,7 +235,12 @@ local function container_row(row, l, peak)
 	local up = is_up(c)
 	local sample = S.samples[c.short]
 	local series = S.series[c.short]
-	local el = frame_of(row_grid(l, SIZE.row):px(8):rounded(6):press(id):no_shrink(), cursor, glow(id, over), marked_on)
+	local el = frame_of(
+		row_grid(l, SIZE.row):px(8):rounded(6):press(id):no_shrink():motion(ROW_MOTION),
+		cursor,
+		glow(id, over),
+		marked_on
+	)
 	-- The dot, or, where something is marked, a box to mark with.
 	if S.any_marked then
 		el:child(b.div():press("mark:" .. c.id):row():justify_center():child(P.check(marked_on)))
@@ -278,7 +293,7 @@ local function group_row(group, first)
 	local cursor = S.cursor.containers == group.id
 	local over = hovered(id) or hovered("ga:toggle:" .. group.key) or hovered("ga:restart:" .. group.key)
 	local el = frame_of(
-		b.div():press(id):row():items_center():gap(8):h(SIZE.row):px(8):rounded(6):no_shrink(),
+		b.div():press(id):row():items_center():gap(8):h(SIZE.row):px(8):rounded(6):no_shrink():motion(ROW_MOTION),
 		cursor,
 		glow(id, over),
 		false

@@ -20,6 +20,11 @@ change what the previous one did.
   as your terminal's text (with ⌘+ and ⌘− in bateri).
 - The filter field widens smoothly as you type in it and gets a soft accent ring, as it did
   before the native page, instead of jumping wider at once.
+- The rows of the container list move as they did before the native page: opening or closing a
+  compose project, sorting or filtering slides the rows to their new places, and rows fade in from
+  a little below as they come and out as they go. Under Reduce Motion nothing moves.
+- The sections of the rail and the buttons that are an icon alone show a tooltip with their name
+  and the key that does the same (Containers 1, Restart r, Logs l).
 - A number beside a section in the rail is always how many there are; the key that goes to the
   section is no longer shown beside System and Activity, where it read as a count.
 - The line between the list and a container's detail can be dragged to make either wider.
