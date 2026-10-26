@@ -34,6 +34,7 @@ local ask_clean, ask_pull, current_container, cursor_row, field_context, go, ste
 local net = model_net.net
 local index_of, keep_cursor, marked, row_tops, rows_of =
 	model_rows.index_of, model_rows.keep_cursor, model_rows.marked, model_rows.row_tops, model_rows.rows_of
+local FIELD = require("../parts/ui").FIELD
 local S, bump, geometry = model_state.S, model_state.bump, model_state.geometry
 
 -- ---- keys --------------------------------------------------------------------------------------------------
@@ -42,7 +43,7 @@ local keys = {}
 
 local function reply_field()
 	S.typing = true
-	return { redraw = true, keyboard = "field" }
+	return { redraw = true, keyboard = { field = FIELD } }
 end
 
 -- A question is open: its keys. Where the host's field has the keyboard it takes the letters; what

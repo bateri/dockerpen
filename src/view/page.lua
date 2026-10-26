@@ -1,5 +1,6 @@
 -- (page entry: assembled from the old page; to be rewritten)
 local lib_kit = require("./lib/kit")
+local parts_ui = require("./parts/ui")
 local input_keys = require("./input/keys")
 local input_mouse = require("./input/mouse")
 local lib_fmt = require("./lib/fmt")
@@ -65,13 +66,25 @@ local function main_screen(g)
 		if open and g.beside then
 			local detail_width = g.detail
 			local list_width = g.main - detail_width
-			return b.div()
+			return b
+				.div()
 				:row()
 				:grow(1)
 				:min_w(0)
 				:min_h(0)
 				:child(screens.list(list_width))
-				:child(b.div():w(1):bg(alpha("border", 0.6)):no_shrink())
+				-- The line between them, which the pointer drags: wider to the pointer than it is drawn.
+				:child(
+					b.div()
+						:w(7)
+						:ml(-3)
+						:mr(-3)
+						:no_shrink()
+						:press("split")
+						:row()
+						:justify_center()
+						:child(b.div():w(1):h_full():bg(alpha("border", ui.pressed == "split" and 1 or 0.6)))
+				)
 				:child(b.div():col():w(detail_width):no_shrink():child(screens.detail(detail_width, true)))
 		elseif open then
 			return frame_:child(screens.detail(g.main, false))
@@ -274,7 +287,9 @@ end
 
 local function cursor_shape()
 	local hover = ui.hover
-	if hover == "field" or hover == "field.room" then
+	if ui.pressed == "split" or hover == "split" then
+		return "resize_horizontal"
+	elseif hover == "field" or hover == "field.room" then
 		return "text"
 	elseif hover ~= nil then
 		return "pointer"
@@ -299,7 +314,7 @@ local function answer(result)
 	end
 	if S.want_field then
 		S.want_field, S.typing = nil, true
-		reply.keyboard = "field"
+		reply.keyboard = { field = parts_ui.FIELD }
 	end
 	reply.cursor = cursor_shape()
 	persist()
@@ -312,6 +327,12 @@ local function handle(event)
 	local result = nil
 	if kind == "move" then
 		S.pointer = { x = event.x, y = event.y }
+		if ui.pressed == "split" then
+			-- The line between the list and a container is dragged: the container's side is what is
+			-- right of the pointer (the layout holds it to what both sides need).
+			S.detail_width = math.max(340, math.floor(S.width - event.x))
+			return { redraw = true, cursor = "resize_horizontal" }
+		end
 		return { redraw = ui:point(b.layout, event), cursor = cursor_shape() }
 	elseif kind == "leave" then
 		S.pointer = nil
@@ -341,9 +362,17 @@ local function handle(event)
 		result = true
 	elseif kind == "scroll" then
 		S.pointer = { x = event.x, y = event.y }
-		local moved = ui:scroll_by(b.layout, event, event.dy)
-		if moved and S.section == "containers" and S.open and S.tab == "logs" then
-			if event.dy < 0 then
+		local dx, dy = event.dx or 0, event.dy or 0
+		local moved = ui:scroll_by(b.layout, event, dx, dy)
+		local over_log = S.section == "containers" and S.open and S.tab == "logs"
+		if over_log and dx ~= 0 then
+			-- Across, a log's lines move under it (they are not a box that scrolls across).
+			local was = L.hscroll
+			L.hscroll = math.max(math.floor(L.hscroll + dx), 0)
+			moved = moved or L.hscroll ~= was
+		end
+		if moved and over_log and dy ~= 0 then
+			if dy < 0 then
 				L.follow = false
 			else
 				local view = views.log or 400
@@ -354,11 +383,23 @@ local function handle(event)
 		end
 		result = moved
 	elseif kind == "key" then
-		-- A key that reaches the page is one the host's field did not take: the keyboard is the page's.
-		S.typing = false
-		result = keys.press(event.key, event.mods)
+		if S.typing and S.palette and (event.key == "up" or event.key == "down") then
+			-- In the palette the arrows choose while the words stay in the field.
+			result = keys.palette(event.key, event.mods)
+		elseif S.typing then
+			-- A key the field gives the page (⏎, Esc, ⇥, an arrow): it leaves the field without a word,
+			-- and the next key is the page's.
+			S.typing = false
+			result = { redraw = true, keyboard = "page" }
+		else
+			result = keys.press(event.key, event.mods)
+		end
 	elseif kind == "text" then
 		on_text(event.text)
+		result = true
+	elseif kind == "focus" then
+		-- The person clicked into the field (or the keyboard left it of itself).
+		S.typing = event.field ~= nil
 		result = true
 	elseif kind == "menu" then
 		local menu = S.menu

@@ -15,7 +15,7 @@ local icon = lib_icons.icon
 local SECTIONS, SIZE = lib_sizes.SECTIONS, lib_sizes.SIZE
 local counts = model_rows.counts
 local S = model_state.S
-local P, T, glow, hovered, lit = parts_ui.P, parts_ui.T, parts_ui.glow, parts_ui.hovered, parts_ui.lit
+local P, T, blend, glow, hovered = parts_ui.P, parts_ui.T, parts_ui.blend, parts_ui.glow, parts_ui.hovered
 
 local rail = {}
 
@@ -126,8 +126,8 @@ local function item(section, compact, rail_hovered)
 	if level > 0 then
 		el:bg(alpha("foreground", 0.06 * level))
 	end
-	local bright = active or lit(level)
-	el:child(icon(section.icon, 15, bright and "foreground" or "dim"))
+	local ink = active and "foreground" or blend("dim", "foreground", level)
+	el:child(icon(section.icon, 15, ink))
 	local end_of = trailing(section, rail_hovered, active)
 	if compact then
 		if end_of and (section.id == "containers" or section.id == "activity") then
@@ -140,7 +140,7 @@ local function item(section, compact, rail_hovered)
 		end
 		return el
 	end
-	el:child(b.div():grow(1):min_w(0):child(P.line(section.label, bright and "foreground" or "dim", SIZE.body)))
+	el:child(b.div():grow(1):min_w(0):child(P.line(section.label, ink, SIZE.body)))
 	if end_of then
 		el:child(end_of)
 	end

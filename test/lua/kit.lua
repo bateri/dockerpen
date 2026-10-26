@@ -109,16 +109,23 @@ function M.start(prelude_dir, page_path)
 			return self.bounds_of[id]
 		end,
 		scroll_extent = function(id)
-			return self.extents[id]
+			local extent = self.extents[id]
+			if extent then
+				-- A test says how far a box reaches down; across it reaches no further than it is.
+				return {
+					content = extent.content,
+					view = extent.view,
+					content_w = extent.content_w or 0,
+					view_w = extent.view_w or 0,
+				}
+			end
+			return nil
 		end,
 		focus_order = function()
 			return {}
 		end,
 		path_of = function()
 			return {}
-		end,
-		text_field = function()
-			return nil
 		end,
 	}
 	pencere = globals
