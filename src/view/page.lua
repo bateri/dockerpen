@@ -333,16 +333,10 @@ local function handle(event)
 			S.detail_width = math.max(340, math.floor(S.width - event.x))
 			return { redraw = true, cursor = "resize_horizontal" }
 		end
-		-- Coming onto the rail or leaving it brings its keys in or out, between its rows as well.
-		local over_rail = rail.pointer_over()
-		local moved_rail = over_rail ~= S.over_rail
-		S.over_rail = over_rail
-		local changed = ui:point(b.layout, event)
-		return { redraw = changed or moved_rail, cursor = cursor_shape() }
+		return { redraw = ui:point(b.layout, event), cursor = cursor_shape() }
 	elseif kind == "leave" then
 		S.pointer = nil
-		S.over_rail = false
-		return { redraw = ui:point(b.layout, nil) or true, cursor = "arrow" }
+		return { redraw = ui:point(b.layout, nil), cursor = "arrow" }
 	elseif kind == "press" then
 		S.pointer = { x = event.x, y = event.y }
 		local hit = ui:press(b.layout, event)
