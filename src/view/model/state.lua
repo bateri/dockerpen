@@ -13,6 +13,7 @@ local S = {
 	clock = nil,
 	width = 1000,
 	height = 640,
+	reduce_motion = false, -- the system's Reduce Motion: a highlight is where it is going at once
 	-- From the program.
 	hostname = "",
 	remote = false,

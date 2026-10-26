@@ -7,6 +7,16 @@ change what the previous one did.
 
 ## [Unreleased]
 
+### Fixed
+
+- The rail counts the images, volumes and networks from the start, instead of showing the keys
+  of the sections (2 to 6) beside them until each had been opened. Their sizes are still
+  counted only when the volumes are on show.
+- What the pointer is over fades in and out instead of switching at once, as it did before the
+  native page: the rail's sections, buttons, tabs, the filters, rows of every list, the palette,
+  the keys at the bottom and the choices of a dialog. The pill under the section on show slides to
+  the one chosen. Under Reduce Motion nothing moves.
+
 ## [0.3.0] - 2026-10-25
 
 ### Changed

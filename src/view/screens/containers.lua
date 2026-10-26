@@ -18,7 +18,8 @@ local display_name, has_issue, is_up, state_of =
 	model_containers.display_name, model_containers.has_issue, model_containers.is_up, model_containers.state_of
 local container_rows, counts, row_tops = model_rows.container_rows, model_rows.counts, model_rows.row_tops
 local S = model_state.S
-local P, T, chosen, hovered = parts_ui.P, parts_ui.T, parts_ui.chosen, parts_ui.hovered
+local P, T, chosen, glow, hover_glow, hovered, lit =
+	parts_ui.P, parts_ui.T, parts_ui.chosen, parts_ui.glow, parts_ui.hover_glow, parts_ui.hovered, parts_ui.lit
 
 local screens = {}
 
@@ -58,7 +59,7 @@ local function head_cell(label, how, align)
 		cell:justify_end()
 	end
 	local active = how ~= nil and S.sort == how
-	local over = how ~= nil and hovered("sorth:" .. how)
+	local over = how ~= nil and lit(hover_glow("sorth:" .. how))
 	if how then
 		cell:press("sorth:" .. how)
 	end
@@ -88,7 +89,7 @@ local function header_row(l)
 end
 
 -- The look of a row that has the cursor, the pointer, or a mark.
-local function frame_of(el, cursor, over, marked_on)
+local function frame_of(el, cursor, level, marked_on)
 	if cursor then
 		if S.focus == "list" then
 			chosen(el, true)
@@ -97,8 +98,8 @@ local function frame_of(el, cursor, over, marked_on)
 		end
 	elseif marked_on then
 		el:bg(alpha("accent", 0.09))
-	elseif over then
-		el:bg(alpha("foreground", 0.06))
+	elseif level > 0 then
+		el:bg(alpha("foreground", 0.06 * level))
 	end
 	return el
 end
@@ -224,7 +225,7 @@ local function container_row(row, l, peak)
 	local up = is_up(c)
 	local sample = S.samples[c.short]
 	local series = S.series[c.short]
-	local el = frame_of(row_grid(l, SIZE.row):px(8):rounded(6):press(id):no_shrink(), cursor, over, marked_on)
+	local el = frame_of(row_grid(l, SIZE.row):px(8):rounded(6):press(id):no_shrink(), cursor, glow(id, over), marked_on)
 	-- The dot, or, where something is marked, a box to mark with.
 	if S.any_marked then
 		el:child(b.div():press("mark:" .. c.id):row():justify_center():child(P.check(marked_on)))
@@ -279,7 +280,7 @@ local function group_row(group, first)
 	local el = frame_of(
 		b.div():press(id):row():items_center():gap(8):h(SIZE.row):px(8):rounded(6):no_shrink(),
 		cursor,
-		over,
+		glow(id, over),
 		false
 	)
 	el:child(

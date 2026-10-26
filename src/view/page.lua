@@ -185,8 +185,9 @@ end
 local function tick_reload()
 	if S.pending_reload and S.now >= S.pending_reload then
 		S.pending_reload = nil
+		-- All three, shown or not: the rail counts them.
 		for _, section in ipairs({ "images", "volumes", "networks" }) do
-			if S.stale[section] and S.section == section then
+			if S.stale[section] then
 				load_list(section)
 			end
 		end
@@ -199,7 +200,7 @@ end
 local started = false
 
 local function render(size, now, reduce_motion)
-	S.width, S.height, S.now = size.w, size.h, now
+	S.width, S.height, S.now, S.reduce_motion = size.w, size.h, now, reduce_motion
 	if not started then
 		started = true
 		net.ask("boot", nil, on_boot)
@@ -228,7 +229,13 @@ local function render(size, now, reduce_motion)
 		S.any_marked = true
 		break
 	end
+	-- The highlights take their step before the page is built from them, and the build says where
+	-- each is going (`parts/ui.lua`'s `glow`); while one is on its way the page is drawn again.
+	ui.fades:advance(now, reduce_motion)
 	local root = build(g)
+	-- A highlight the build has just set going starts its clock now (a step of nothing), so the
+	-- next frame takes it a frame's way and not none.
+	local fading = ui.fades:advance(now, reduce_motion)
 	local wake = nil
 	local function wake_at(at)
 		if at then
@@ -243,7 +250,7 @@ local function render(size, now, reduce_motion)
 	if S.open and S.tab == "processes" and S.processes.at then
 		wake_at(S.processes.at + 2.05)
 	end
-	return root, scanning, wake
+	return root, scanning or fading, wake
 end
 
 -- The keyboard goes to the host's field, or to the page.

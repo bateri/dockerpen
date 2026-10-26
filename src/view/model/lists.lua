@@ -21,12 +21,11 @@ local function load_list(section)
 		else
 			S.problems[section] = nil
 			S.lists[section] = result[section]
-			if section == "volumes" and not result.sized then
-				net.ask("volume_sizes", nil, function(counted, failed)
-					-- A count that failed leaves no sizes, and the list says so and not "counting".
-					S.volume_sizes = failed and {} or counted.sizes
-					bump()
-				end)
+			if section == "volumes" then
+				-- The sizes are counted when the volumes are on show (`load_sizes`), each time
+				-- they are listed again: the count is the slow part, and the rail only counts them.
+				S.volumes_sized = result.sized == true
+				S.sizes_asked = false
 			end
 		end
 		bump()
@@ -34,6 +33,16 @@ local function load_list(section)
 		if S.stale[section] then
 			load_list(section)
 		end
+	end)
+end
+
+-- What each volume takes, which docker counts apart from the list (and slowly).
+local function load_sizes()
+	S.sizes_asked = true
+	net.ask("volume_sizes", nil, function(counted, failed)
+		-- A count that failed leaves no sizes, and the list says so and not "counting".
+		S.volume_sizes = failed and {} or counted.sizes
+		bump()
 	end)
 end
 
@@ -112,6 +121,7 @@ return {
 	load_detail = load_detail,
 	load_list = load_list,
 	load_processes = load_processes,
+	load_sizes = load_sizes,
 	load_system = load_system,
 	signature = signature,
 }

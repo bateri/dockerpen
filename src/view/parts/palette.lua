@@ -10,7 +10,7 @@ local alpha, b, ui = lib_kit.alpha, lib_kit.b, lib_kit.ui
 local SIZE = lib_sizes.SIZE
 local palette = model_palette.palette
 local S = model_state.S
-local P, T, hovered = parts_ui.P, parts_ui.T, parts_ui.hovered
+local P, T, glow, hovered = parts_ui.P, parts_ui.T, parts_ui.glow, parts_ui.hovered
 
 local part = {}
 
@@ -114,10 +114,11 @@ function part.view()
 		local active = index == p.active
 		local role = entry.tone or "foreground"
 		local row = b.div():row():items_center():gap(10):h(ITEM):px(10):rounded(8):press(id):no_shrink()
+		local level = glow(id, hovered(id) and not active)
 		if active then
 			row:bg(alpha("accent", 0.13))
-		elseif hovered(id) then
-			row:bg(alpha("foreground", 0.05))
+		elseif level > 0 then
+			row:bg(alpha("foreground", 0.05 * level))
 		end
 		row:child(P.icon(entry.icon, 15, entry.tone or "dim"))
 		row:child(b.div():grow(1):min_w(0):child(title_of(entry.title, item.positions, role)))

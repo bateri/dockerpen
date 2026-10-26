@@ -45,6 +45,49 @@ local function hovered(id)
 	return ui.hover == id
 end
 
+-- How far the highlight named `key` has come, 0 to 1, on its way in while `on` and out while not:
+-- a ground or a colour that the pointer brings comes and goes over the kit's fade (an eighth of a
+-- second) instead of switching, as the web page's did over its transition. The page is drawn again
+-- while one is on its way (`page.lua`'s `render`); under Reduce Motion each is where it is going.
+local function glow(key, on)
+	local name = "glow:" .. key
+	if S.reduce_motion then
+		ui.fades:snap(name, on and 1 or 0)
+	else
+		ui.fades:to(name, on and 1 or 0)
+	end
+	return ui.fades:level(name)
+end
+
+-- The highlight of what the pointer is over, by the element's id.
+local function hover_glow(id)
+	return glow(id, ui.hover == id)
+end
+
+-- Whether a highlight is far enough in for words and icons to take the brighter colour: half way,
+-- where its ground is (a role cannot be part one colour and part another).
+local function lit(level)
+	return level >= 0.5
+end
+
+-- `el`'s ground on its way from what it is to `colour`, as far as `level`: a layer of `colour` at
+-- that opacity under what it holds (so it is to be the first of its children), in its corners
+-- (`radius`, el's own). An element with a border says how wide (`edge`): the layer stays inside it,
+-- as a placed child covers its parent's whole box, border and all.
+local function toward(el, level, colour, radius, edge)
+	edge = edge or 0
+	if level > 0 then
+		el:child(
+			b.div()
+				:absolute()
+				:inset(edge, edge, edge, edge)
+				:rounded(math.max((radius or 0) - edge, 0))
+				:bg(alpha(colour, level))
+		)
+	end
+	return el
+end
+
 -- What is chosen: the accent at an eighth, with a line of it round (`strong`: the keys are here).
 local function chosen(el, strong)
 	return el:bg(alpha("accent", 0.13)):border(1, alpha("accent", strong and 0.55 or 0.3))
@@ -82,6 +125,7 @@ function P.button(id, label, o)
 	local small = o.size == "sm" or o.h ~= nil
 	local height = o.h or (small and SIZE.small_control or SIZE.control)
 	local over = hovered(id) and not o.disabled
+	local level = glow(id, over)
 	local down = ui.pressed == id and over
 	local el = b.div():row():items_center():justify_center():gap(small and 5 or 6):h(height):rounded(6):no_shrink()
 	if label == nil then
@@ -101,18 +145,21 @@ function P.button(id, label, o)
 			chosen(el, true)
 		elseif variant == "primary" then
 			ink = "background"
-			el:bg(down and alpha("accent", 0.75) or (over and alpha("accent", 0.88) or "accent"))
+			el:bg(down and alpha("accent", 0.75) or (level > 0 and alpha("accent", 1 - 0.12 * level) or "accent"))
 		elseif variant == "danger" then
 			ink = "background"
-			el:bg(down and alpha("error", 0.75) or (over and alpha("error", 0.88) or "error"))
+			el:bg(down and alpha("error", 0.75) or (level > 0 and alpha("error", 1 - 0.12 * level) or "error"))
 		elseif variant == "danger-ghost" then
 			ink = "error"
-			el:bg(over and alpha("error", down and 0.2 or 0.12) or nil)
+			el:bg(down and alpha("error", 0.2) or (level > 0 and alpha("error", 0.12 * level) or nil))
 		elseif variant == "ghost" then
-			ink = over and "foreground" or "dim"
-			el:bg(over and alpha("foreground", down and 0.1 or 0.06) or nil)
+			ink = lit(level) and "foreground" or "dim"
+			el:bg(down and alpha("foreground", 0.1) or (level > 0 and alpha("foreground", 0.06 * level) or nil))
 		else
-			el:bg(over and (down and "raised4" or "raised3") or "raised2"):border(1, alpha("border", 0.6))
+			el:bg(down and "raised4" or "raised2"):border(1, alpha("border", 0.6))
+			if not down then
+				toward(el, level, "raised3", 6, 1)
+			end
 		end
 	end
 	if o.ink and not o.disabled then
@@ -302,7 +349,7 @@ function P.tabs(list, current, prefix)
 	for _, tab in ipairs(list) do
 		local id = prefix .. tab.id
 		local active = tab.id == current
-		local over = hovered(id)
+		local level = glow(id, hovered(id) and not active)
 		row:child(
 			b.div()
 				:press(id)
@@ -311,7 +358,7 @@ function P.tabs(list, current, prefix)
 				:px(10)
 				:h(34)
 				:no_shrink()
-				:bg(over and not active and alpha("foreground", 0.05) or nil)
+				:bg(level > 0 and alpha("foreground", 0.05 * level) or nil)
 				:rounded_corners({ 5, 5, 0, 0 })
 				:child(
 					b.div()
@@ -440,12 +487,13 @@ function P.segmented(prefix, options, current, seg_px)
 		local id = prefix .. option.id
 		local active = option.id == current
 		local seg = b.div():row():items_center():gap(6):h(24):px(seg_px or 9):rounded(6):press(id):no_shrink()
+		local level = glow(id, hovered(id) and not active)
 		if active then
 			seg:bg("raised2"):border(1, alpha("border", 0.8))
-		elseif hovered(id) then
-			seg:bg(alpha("foreground", 0.05))
+		elseif level > 0 then
+			seg:bg(alpha("foreground", 0.05 * level))
 		end
-		seg:child(T(option.label, (active or hovered(id)) and "foreground" or "dim", SIZE.body))
+		seg:child(T(option.label, (active or lit(level)) and "foreground" or "dim", SIZE.body))
 		if option.count ~= nil then
 			local role = option.tone and option.count > 0 and option.tone or (active and "dim" or "quiet")
 			seg:child(T(tostring(option.count), role, SIZE.tiny + 0.5))
@@ -457,9 +505,10 @@ end
 
 -- A switch with its word: on or off.
 function P.switch(id, label, on)
-	local over = hovered(id)
+	local level = hover_glow(id)
+	local over = lit(level)
 	local track = b.div():w(26):h(14):rounded(7):no_shrink():row():items_center():px(2)
-	track:bg(on and "accent" or alpha("foreground", over and 0.22 or 0.16))
+	track:bg(on and "accent" or alpha("foreground", 0.16 + 0.06 * level))
 	if on then
 		track:justify_end()
 	end
@@ -557,5 +606,9 @@ return {
 	P = P,
 	T = T,
 	chosen = chosen,
+	glow = glow,
+	hover_glow = hover_glow,
 	hovered = hovered,
+	lit = lit,
+	toward = toward,
 }

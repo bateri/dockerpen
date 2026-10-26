@@ -655,13 +655,18 @@ local IMAGES = {
 	},
 }
 
-t.test("the lists of images, volumes and networks are asked for when they come on show", function()
+t.test("the lists of images, volumes and networks are asked for once the page starts, for the rail", function()
 	local k = opened()
-	t.eq(#k:calls_of("images"), 0)
-	k:key("2")
 	t.eq(#k:calls_of("images"), 1)
+	t.eq(#k:calls_of("volumes"), 1)
+	t.eq(#k:calls_of("networks"), 1)
 	k:answer("images", { images = IMAGES })
+	k:answer("volumes", { sized = false, volumes = {} })
 	k:render(1300, 760, 102)
+	t.eq(#k:calls_of("volume_sizes"), 0, "the volumes' sizes wait until they are on show")
+	t.eq(kit.texts(kit.find(k.root, "sec:images")), { "Images", "3" }, "the rail counts the images")
+	k:key("2")
+	k:render(1300, 760, 103)
 	local texts = page_texts(k)
 	t.has(texts, "node:22-alpine")
 	t.has(texts, "+1", "a second tag")
@@ -670,11 +675,79 @@ t.test("the lists of images, volumes and networks are asked for when they come o
 	t.has(texts, "shop-api-1")
 	t.has(texts, "3 images · 1.3 GB")
 	k:key("3")
-	t.eq(#k:calls_of("volumes"), 1)
 	k:key("4")
-	t.eq(#k:calls_of("networks"), 1)
 	k:key("2")
 	t.eq(#k:calls_of("images"), 1, "a list that was asked for is not asked for again")
+	t.eq(#k:calls_of("volumes"), 1)
+	t.eq(#k:calls_of("networks"), 1)
+end)
+
+t.test("a section's highlight in the rail comes in and goes as the pointer comes and goes", function()
+	local k = opened()
+	local function fill()
+		local fill = kit.find(k.root, "sec:images").style.fill
+		return fill and fill[2] or 0
+	end
+	k.hit_id = "sec:images"
+	t.eq(k:event({ type = "move", x = 60, y = 150 }).redraw, true)
+	local _, animating = k:render(1300, 760, 102)
+	t.ok(animating, "the page is drawn again while the highlight comes")
+	k:render(1300, 760, 102.05)
+	local half = fill()
+	t.ok(half > 0 and half < 0.06, "half way in: " .. half)
+	k:render(1300, 760, 102.1)
+	_, animating = k:render(1300, 760, 102.15)
+	t.eq(fill(), 0.06, "all the way in")
+	t.ok(not animating, "and at rest")
+	k.hit_id = nil
+	k:event({ type = "leave" })
+	k:render(1300, 760, 103)
+	k:render(1300, 760, 103.05)
+	t.ok(fill() > 0 and fill() < 0.06, "on its way out")
+	k:render(1300, 760, 103.1)
+	k:render(1300, 760, 103.15)
+	t.eq(fill(), 0, "gone")
+end)
+
+t.test("the pill under the section on show slides to the one chosen", function()
+	local k = opened()
+	local function top()
+		return kit.find(k.root, "rail.pill").style.inset.top
+	end
+	t.eq(top(), 10, "under the containers")
+	k:key("3")
+	local _, animating = k:render(1300, 760, 102)
+	t.ok(animating, "it moves")
+	t.eq(top(), 10, "from where it was")
+	k:render(1300, 760, 102.05)
+	t.ok(top() > 10 and top() < 74, "on its way: " .. top())
+	k:render(1300, 760, 102.1)
+	_, animating = k:render(1300, 760, 102.15)
+	t.eq(top(), 74, "under the volumes")
+	t.ok(not animating, "and at rest")
+end)
+
+t.test("a button's ground comes up under the pointer and goes", function()
+	local k = opened()
+	local function ground()
+		local fill = kit.find(k.root, "sort").style.fill
+		return fill and fill[2] or 0
+	end
+	t.eq(ground(), 0)
+	k.hit_id = "sort"
+	k:event({ type = "move", x = 1300, y = 160 })
+	k:render(1300, 760, 102)
+	k:render(1300, 760, 102.05)
+	t.ok(ground() > 0 and ground() < 0.06, "half way: " .. ground())
+	k:render(1300, 760, 102.1)
+	k:render(1300, 760, 102.15)
+	t.eq(ground(), 0.06)
+	k.hit_id = nil
+	k:event({ type = "leave" })
+	for _, at in ipairs({ 103, 103.05, 103.1, 103.15 }) do
+		k:render(1300, 760, at)
+	end
+	t.eq(ground(), 0, "gone")
 end)
 
 t.test("a list the program could not make says why", function()

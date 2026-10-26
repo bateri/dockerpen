@@ -14,7 +14,7 @@ local SIZE = lib_sizes.SIZE
 local virtual = lib_virtual.virtual
 local is_problem, plain_rows, row_tops = model_rows.is_problem, model_rows.plain_rows, model_rows.row_tops
 local S = model_state.S
-local P, T, chosen, hovered = parts_ui.P, parts_ui.T, parts_ui.chosen, parts_ui.hovered
+local P, T, chosen, glow, hovered = parts_ui.P, parts_ui.T, parts_ui.chosen, parts_ui.glow, parts_ui.hovered
 
 local screens = {}
 
@@ -143,10 +143,11 @@ function screens.activity(width)
 		local exists = item.type == "container" and S.by_id[item.id] ~= nil
 		local over = hovered(id) or hovered("ev:open:" .. row.id)
 		local el = b.div():row():items_center():gap(10):h(SIZE.row):px(8):rounded(6):press(id):no_shrink()
+		local level = glow(id, over)
 		if cursor then
 			chosen(el, true)
-		elseif over then
-			el:bg(alpha("foreground", 0.06))
+		elseif level > 0 then
+			el:bg(alpha("foreground", 0.06 * level))
 		end
 		el:child(b.div():w(70):no_shrink():child(T(item.clock or "", "quiet", SIZE.small + 0.5)))
 		local chip = b.div():size(22, 22):rounded(7):row():items_center():justify_center():no_shrink()
