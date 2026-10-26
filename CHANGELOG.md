@@ -7,6 +7,8 @@ change what the previous one did.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-26
+
 ### Fixed
 
 - The rail counts the images, volumes and networks from the start, instead of showing the keys
