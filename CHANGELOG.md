@@ -18,6 +18,11 @@ change what the previous one did.
   the one chosen. Under Reduce Motion nothing moves.
 - Words that brighten under the pointer do so as smoothly as their ground, and the page is as large
   as your terminal's text (with ⌘+ and ⌘− in bateri).
+- The filter field widens smoothly as you type in it and gets a soft accent ring, as it did
+  before the native page, instead of jumping wider at once.
+- The rail shows the keys of System and Activity (the sections without a count) faintly while
+  the pointer is anywhere over it, as before, instead of a number flickering beside each section
+  the pointer passed.
 - The line between the list and a container's detail can be dragged to make either wider.
 - In the palette, ↑ and ↓ choose while what you typed stays in the field; ⏎, Esc and ⇥ leave the
   field as before.

@@ -32,11 +32,12 @@ end
 function toolbar.containers(width)
 	local count = counts()
 	local narrow = tight()
-	local field_width = nil
+	local field_width, field_wide = nil, nil
 	if not narrow and width >= 600 then
-		field_width = (S.field == "list" and S.typing) and 300 or 220
+		field_width, field_wide = 220, 300
 	end
-	local field = P.field(S.field == "list", "Filter by name, image, port…", field_width, narrow and 90 or 120)
+	local field =
+		P.field(S.field == "list", "Filter by name, image, port…", field_width, narrow and 90 or 120, field_wide)
 	local options = {}
 	for _, f in ipairs(FILTERS) do
 		options[#options + 1] = {
@@ -82,7 +83,7 @@ end
 -- the field says while it is empty ("Filter images"). The field gives way to the segments where both
 -- do not fit, and what still does not is cut at the edge rather than drawn past it.
 function toolbar.plain(width, segments, extra, hint)
-	local bar = b.div():row():items_center():gap(6):h(SIZE.bar):pb(8):px(14):no_shrink():clip()
+	local bar = b.div():row():items_center():gap(6):h(SIZE.bar):pb(8):px(14):no_shrink()
 	local room = segments and #segments.options >= 6 and 700 or 470
 	if width >= room then
 		bar:child(P.field(S.field == "list", hint or "Filter by name, image, port…", width >= 600 and 220 or nil))

@@ -14,6 +14,7 @@ local S = {
 	width = 1000,
 	height = 640,
 	reduce_motion = false, -- the system's Reduce Motion: a highlight is where it is going at once
+	over_rail = false, -- the pointer is over the rail (between its rows too): its keys are coming in
 	-- From the program.
 	hostname = "",
 	remote = false,
