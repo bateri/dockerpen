@@ -7,6 +7,11 @@ change what the previous one did.
 
 ## [Unreleased]
 
+### Changed
+
+- The page's tests run against pencere kit 2.0 as well as 1.0: the Lua test host offers the drag
+  queries the 2.0 prelude asks for.
+
 ## [0.4.0] - 2026-10-26
 
 ### Fixed

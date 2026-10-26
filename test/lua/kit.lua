@@ -127,6 +127,13 @@ function M.start(prelude_dir, page_path)
 		path_of = function()
 			return {}
 		end,
+		-- Version 2 of the page API: nothing on the page can be dragged, nor dropped on.
+		drag_source = function()
+			return nil
+		end,
+		drop_target = function()
+			return nil
+		end,
 	}
 	pencere = globals
 	for _, name in ipairs(PARTS) do
