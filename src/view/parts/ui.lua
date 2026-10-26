@@ -447,8 +447,11 @@ end
 -- while it is empty either way (the text in its room is the host field's hint, and the page does not
 -- draw it). `width` fixes its width (else it takes what there is), `min` is the least it gives way to
 -- (120).
-function P.field(active, hint, width, min)
-	local focused = active and S.typing
+function P.field(active, hint, width, min, wide)
+	-- While the keyboard is in it the box comes forward, as the web page's did over a fifth of a second:
+	-- the page's ground, the accent's line and a soft ring of it round the box, and (where `wide` says)
+	-- more room, eased in.
+	local level = glow("field.focus:" .. hint, active and S.typing)
 	local box = b.div()
 		:row()
 		:items_center()
@@ -457,13 +460,18 @@ function P.field(active, hint, width, min)
 		:pl(8)
 		:pr(5)
 		:rounded(6)
-		:bg(focused and "background" or "raised1")
-		:border(1, focused and "accent" or alpha("border", 0.6))
+		:bg(blend("raised1", "background", level))
+		:border(1, alpha(blend("border", "accent", level), 0.6 + 0.4 * level))
 		:press("field")
 	if width then
-		box:w(width):min_w(min or 120)
+		local eased = 1 - (1 - level) ^ 3
+		box:w(wide and math.floor(width + (wide - width) * eased) or width):min_w(min or 120)
 	else
 		box:grow(1):min_w(min or 120)
+	end
+	if level > 0 then
+		-- The ring: three points outside the box, the accent at a little under a fifth.
+		box:child(b.div():absolute():inset(-3, -3, -3, -3):rounded(9):border(3, alpha("accent", 0.18 * level)))
 	end
 	box:child(icon("search", 14, "quiet"))
 	if active then
