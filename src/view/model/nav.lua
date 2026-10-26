@@ -19,10 +19,11 @@ local act, ask = model_act.act, model_act.ask
 local is_up = model_containers.is_up
 local DISK = model_disk.DISK
 local on_stats = model_feed.on_stats
-local load_detail, load_list, load_processes, load_system, signature =
+local load_detail, load_list, load_processes, load_sizes, load_system, signature =
 	model_lists.load_detail,
 	model_lists.load_list,
 	model_lists.load_processes,
+	model_lists.load_sizes,
 	model_lists.load_system,
 	model_lists.signature
 local L, log_clear, log_live, on_log = model_log.L, model_log.log_clear, model_log.log_live, model_log.on_log
@@ -129,7 +130,8 @@ local function restore(kept)
 end
 
 -- Brings what is asked of the program in line with what is on show: the readings while the
--- containers are, the log while it is, the lists of the section that is.
+-- containers are, the log while it is, the lists of the section that is (and each list once, for
+-- the rail's counts).
 local function sync()
 	if not S.ready then
 		return
@@ -180,9 +182,16 @@ local function sync()
 		end
 	end
 	for _, section in ipairs({ "images", "volumes", "networks" }) do
-		if S.section == section and (S.lists[section] == nil and not S.problems[section] or S.stale[section]) then
+		local shown = S.section == section
+		if shown and (S.lists[section] == nil and not S.problems[section] or S.stale[section]) then
+			load_list(section)
+		elseif S.lists[section] == nil and not S.problems[section] and not S.loading[section] then
+			-- Listed once the page has started, on show or not, so that the rail has their counts.
 			load_list(section)
 		end
+	end
+	if S.section == "volumes" and S.lists.volumes and not S.volumes_sized and not S.sizes_asked then
+		load_sizes()
 	end
 	if (S.section == "system" or S.dialog and S.dialog.needs_system) and (S.system == nil or S.stale.system) then
 		load_system()

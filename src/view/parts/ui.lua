@@ -45,6 +45,12 @@ local function hovered(id)
 	return ui.hover == id
 end
 
+-- How far the highlight of what the pointer is over has come, 0 to 1: it comes in and goes over
+-- the kit's fade (an eighth of a second) as the pointer comes and goes (`page.lua`'s `point`).
+local function hover_level(id)
+	return ui.fades:level("hover:" .. id)
+end
+
 -- What is chosen: the accent at an eighth, with a line of it round (`strong`: the keys are here).
 local function chosen(el, strong)
 	return el:bg(alpha("accent", 0.13)):border(1, alpha("accent", strong and 0.55 or 0.3))
@@ -557,5 +563,6 @@ return {
 	P = P,
 	T = T,
 	chosen = chosen,
+	hover_level = hover_level,
 	hovered = hovered,
 }

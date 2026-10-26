@@ -15,7 +15,7 @@ local icon = lib_icons.icon
 local SECTIONS, SIZE = lib_sizes.SECTIONS, lib_sizes.SIZE
 local counts = model_rows.counts
 local S = model_state.S
-local P, T, hovered = parts_ui.P, parts_ui.T, parts_ui.hovered
+local P, T, hover_level, hovered = parts_ui.P, parts_ui.T, parts_ui.hover_level, parts_ui.hovered
 
 local rail = {}
 
@@ -79,10 +79,11 @@ local function item(section, compact, rail_hovered)
 	else
 		el:px(8)
 	end
+	local lit = hover_level(id)
 	if active then
 		el:bg(alpha("accent", 0.13)):border(1, alpha("accent", 0.24))
-	elseif hovered(id) then
-		el:bg(alpha("foreground", 0.06))
+	elseif lit > 0 then
+		el:bg(alpha("foreground", 0.06 * lit))
 	end
 	el:child(icon(section.icon, 15, (active or hovered(id)) and "foreground" or "dim"))
 	local end_of = trailing(section, rail_hovered, active)
@@ -190,10 +191,11 @@ function rail.strip()
 		local id = "sec:" .. section.id
 		local active = S.section == section.id
 		local el = b.div():press(id):row():items_center():gap(6):h(26):px(8):rounded(6)
+		local lit = hover_level(id)
 		if active then
 			el:bg(alpha("accent", 0.13)):border(1, alpha("accent", 0.24))
-		elseif hovered(id) then
-			el:bg(alpha("foreground", 0.06))
+		elseif lit > 0 then
+			el:bg(alpha("foreground", 0.06 * lit))
 		end
 		el:child(icon(section.icon, 14, active and "foreground" or "dim"))
 		if S.width >= 380 then

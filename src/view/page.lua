@@ -185,8 +185,9 @@ end
 local function tick_reload()
 	if S.pending_reload and S.now >= S.pending_reload then
 		S.pending_reload = nil
+		-- All three, shown or not: the rail counts them.
 		for _, section in ipairs({ "images", "volumes", "networks" }) do
-			if S.stale[section] and S.section == section then
+			if S.stale[section] then
 				load_list(section)
 			end
 		end
@@ -194,6 +195,22 @@ local function tick_reload()
 			load_system()
 		end
 	end
+end
+
+-- The pointer is at `at` (nil: it left the page): what it is over now, with the highlight of what it
+-- left fading out and of what it came to fading in. Whether what it is over changed.
+local function point(at)
+	local was = ui.hover
+	if not ui:point(b.layout, at) then
+		return false
+	end
+	if was then
+		ui.fades:to("hover:" .. was, 0)
+	end
+	if ui.hover then
+		ui.fades:to("hover:" .. ui.hover, 1)
+	end
+	return true
 end
 
 local started = false
@@ -228,6 +245,9 @@ local function render(size, now, reduce_motion)
 		S.any_marked = true
 		break
 	end
+	-- The highlights take their step before the page is built from them; while one is on its way
+	-- the page is drawn again.
+	local fading = ui.fades:advance(now, reduce_motion)
 	local root = build(g)
 	local wake = nil
 	local function wake_at(at)
@@ -243,7 +263,7 @@ local function render(size, now, reduce_motion)
 	if S.open and S.tab == "processes" and S.processes.at then
 		wake_at(S.processes.at + 2.05)
 	end
-	return root, scanning, wake
+	return root, scanning or fading, wake
 end
 
 -- The keyboard goes to the host's field, or to the page.
@@ -305,10 +325,10 @@ local function handle(event)
 	local result = nil
 	if kind == "move" then
 		S.pointer = { x = event.x, y = event.y }
-		return { redraw = ui:point(b.layout, event), cursor = cursor_shape() }
+		return { redraw = point(event), cursor = cursor_shape() }
 	elseif kind == "leave" then
 		S.pointer = nil
-		return { redraw = ui:point(b.layout, nil), cursor = "arrow" }
+		return { redraw = point(nil), cursor = "arrow" }
 	elseif kind == "press" then
 		S.pointer = { x = event.x, y = event.y }
 		local hit = ui:press(b.layout, event)
@@ -374,7 +394,7 @@ local function settle()
 		end
 	end
 	if S.pointer then
-		moved = ui:point(b.layout, S.pointer) or moved
+		moved = point(S.pointer) or moved
 	end
 	return moved
 end

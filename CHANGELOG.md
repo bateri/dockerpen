@@ -7,6 +7,14 @@ change what the previous one did.
 
 ## [Unreleased]
 
+### Fixed
+
+- The rail counts the images, volumes and networks from the start, instead of showing the keys
+  of the sections (2 to 6) beside them until each had been opened. Their sizes are still
+  counted only when the volumes are on show.
+- A section's highlight in the rail fades in and out as the pointer comes and goes, as it did
+  before the native page, instead of switching at once.
+
 ## [0.3.0] - 2026-10-25
 
 ### Changed
