@@ -15,9 +15,50 @@ local icon = lib_icons.icon
 local SECTIONS, SIZE = lib_sizes.SECTIONS, lib_sizes.SIZE
 local counts = model_rows.counts
 local S = model_state.S
-local P, T, hover_level, hovered = parts_ui.P, parts_ui.T, parts_ui.hover_level, parts_ui.hovered
+local P, T, glow, hovered, lit = parts_ui.P, parts_ui.T, parts_ui.glow, parts_ui.hovered, parts_ui.lit
 
 local rail = {}
+
+-- A section's row is this tall, the rows this far apart, the first this far down.
+local ITEM, GAP, TOP = 30, 2, 10
+
+-- The pill under the section on show: where it set out from and where it is going, as indexes of
+-- `SECTIONS`, and how far it has come (the fade named PILL). Moved from one section to another, it
+-- slides, as the web page's did.
+local PILL = "rail.pill"
+local pill = { from = nil, to = nil }
+
+-- Where the pill is now: an index, part way from one to the next while it moves.
+local function pill_at()
+	local level = ui.fades:level(PILL)
+	-- Fast at first and settling, as a spring with little bounce.
+	local eased = 1 - (1 - level) ^ 3
+	return pill.from + (pill.to - pill.from) * eased
+end
+
+-- The pill for the section at `index` of `SECTIONS`: a step on its way there, from where it is.
+local function pill_to(index)
+	if pill.to == nil then
+		pill.from, pill.to = index, index
+		ui.fades:snap(PILL, 1)
+	elseif pill.to ~= index then
+		pill.from, pill.to = pill_at(), index
+		ui.fades:snap(PILL, 0)
+	end
+	if S.reduce_motion then
+		ui.fades:snap(PILL, 1)
+	else
+		ui.fades:to(PILL, 1)
+	end
+	return b.div()
+		:id(PILL)
+		:absolute()
+		:inset(TOP + (pill_at() - 1) * (ITEM + GAP), 8, nil, 8)
+		:h(ITEM)
+		:rounded(6)
+		:bg(alpha("accent", 0.13))
+		:border(1, alpha("accent", 0.24))
+end
 
 -- What the engine reported since the page came that is worth a look: a container died, was killed,
 -- ran out of memory, or went unhealthy.
@@ -70,22 +111,23 @@ local function trailing(section, rail_hovered, active)
 	return nil
 end
 
+-- A section's row: its ground is the pointer's (the one that is on show has the pill, which
+-- `rail.column` moves under it).
 local function item(section, compact, rail_hovered)
 	local id = "sec:" .. section.id
 	local active = S.section == section.id
-	local el = b.div():press(id):row():items_center():gap(10):h(30):rounded(6):no_shrink()
+	local el = b.div():press(id):row():items_center():gap(10):h(ITEM):rounded(6):no_shrink()
 	if compact then
 		el:justify_center()
 	else
 		el:px(8)
 	end
-	local lit = hover_level(id)
-	if active then
-		el:bg(alpha("accent", 0.13)):border(1, alpha("accent", 0.24))
-	elseif lit > 0 then
-		el:bg(alpha("foreground", 0.06 * lit))
+	local level = glow(id, hovered(id) and not active)
+	if level > 0 then
+		el:bg(alpha("foreground", 0.06 * level))
 	end
-	el:child(icon(section.icon, 15, (active or hovered(id)) and "foreground" or "dim"))
+	local bright = active or lit(level)
+	el:child(icon(section.icon, 15, bright and "foreground" or "dim"))
 	local end_of = trailing(section, rail_hovered, active)
 	if compact then
 		if end_of and (section.id == "containers" or section.id == "activity") then
@@ -98,12 +140,7 @@ local function item(section, compact, rail_hovered)
 		end
 		return el
 	end
-	el:child(
-		b.div()
-			:grow(1)
-			:min_w(0)
-			:child(P.line(section.label, (active or hovered(id)) and "foreground" or "dim", SIZE.body))
-	)
+	el:child(b.div():grow(1):min_w(0):child(P.line(section.label, bright and "foreground" or "dim", SIZE.body)))
 	if end_of then
 		el:child(end_of)
 	end
@@ -170,7 +207,17 @@ end
 function rail.column(compact)
 	local over_rail = ui.hover ~= nil and string.sub(ui.hover, 1, 4) == "sec:"
 	local width = compact and SIZE.rail_compact or SIZE.rail
-	local col = b.div():col():w(width):no_shrink():gap(2):px(8):pt(10):pb(8):bg("raised1")
+	local col = b.div():col():w(width):no_shrink():gap(GAP):px(8):pt(TOP):pb(8):bg("raised1")
+	local shown = nil
+	for index, section in ipairs(SECTIONS) do
+		if section.id == S.section then
+			shown = index
+		end
+	end
+	-- First, so that the rows are drawn over it.
+	if shown then
+		col:child(pill_to(shown))
+	end
 	for _, section in ipairs(SECTIONS) do
 		col:child(item(section, compact, over_rail))
 	end
@@ -191,11 +238,11 @@ function rail.strip()
 		local id = "sec:" .. section.id
 		local active = S.section == section.id
 		local el = b.div():press(id):row():items_center():gap(6):h(26):px(8):rounded(6)
-		local lit = hover_level(id)
+		local level = glow(id, hovered(id) and not active)
 		if active then
 			el:bg(alpha("accent", 0.13)):border(1, alpha("accent", 0.24))
-		elseif lit > 0 then
-			el:bg(alpha("foreground", 0.06 * lit))
+		elseif level > 0 then
+			el:bg(alpha("foreground", 0.06 * level))
 		end
 		el:child(icon(section.icon, 14, active and "foreground" or "dim"))
 		if S.width >= 380 then

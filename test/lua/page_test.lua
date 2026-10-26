@@ -709,6 +709,47 @@ t.test("a section's highlight in the rail comes in and goes as the pointer comes
 	t.eq(fill(), 0, "gone")
 end)
 
+t.test("the pill under the section on show slides to the one chosen", function()
+	local k = opened()
+	local function top()
+		return kit.find(k.root, "rail.pill").style.inset.top
+	end
+	t.eq(top(), 10, "under the containers")
+	k:key("3")
+	local _, animating = k:render(1300, 760, 102)
+	t.ok(animating, "it moves")
+	t.eq(top(), 10, "from where it was")
+	k:render(1300, 760, 102.05)
+	t.ok(top() > 10 and top() < 74, "on its way: " .. top())
+	k:render(1300, 760, 102.1)
+	_, animating = k:render(1300, 760, 102.15)
+	t.eq(top(), 74, "under the volumes")
+	t.ok(not animating, "and at rest")
+end)
+
+t.test("a button's ground comes up under the pointer and goes", function()
+	local k = opened()
+	local function ground()
+		local fill = kit.find(k.root, "sort").style.fill
+		return fill and fill[2] or 0
+	end
+	t.eq(ground(), 0)
+	k.hit_id = "sort"
+	k:event({ type = "move", x = 1300, y = 160 })
+	k:render(1300, 760, 102)
+	k:render(1300, 760, 102.05)
+	t.ok(ground() > 0 and ground() < 0.06, "half way: " .. ground())
+	k:render(1300, 760, 102.1)
+	k:render(1300, 760, 102.15)
+	t.eq(ground(), 0.06)
+	k.hit_id = nil
+	k:event({ type = "leave" })
+	for _, at in ipairs({ 103, 103.05, 103.1, 103.15 }) do
+		k:render(1300, 760, at)
+	end
+	t.eq(ground(), 0, "gone")
+end)
+
 t.test("a list the program could not make says why", function()
 	local k = opened()
 	k:key("2")

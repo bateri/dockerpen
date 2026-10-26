@@ -15,7 +15,7 @@ local SIZE = lib_sizes.SIZE
 local act = model_act.act
 local marked, targets = model_rows.marked, model_rows.targets
 local S = model_state.S
-local P, T, hovered = parts_ui.P, parts_ui.T, parts_ui.hovered
+local P, T, hover_glow, lit = parts_ui.P, parts_ui.T, parts_ui.hover_glow, parts_ui.lit
 
 local status = {}
 
@@ -119,13 +119,14 @@ end
 
 -- A key and what it does, as a small button where it is something to press.
 local function hint(entry, id)
-	local over = id ~= nil and hovered(id)
+	local level = id ~= nil and hover_glow(id) or 0
+	local over = lit(level)
 	local el = b.div():row():items_center():gap(5):h(20):px(4):rounded(4):no_shrink()
 	if id then
 		el:press(id)
 	end
-	if over then
-		el:bg(alpha("foreground", 0.06))
+	if level > 0 then
+		el:bg(alpha("foreground", 0.06 * level))
 	end
 	el:child(P.kbd(entry.keys, SIZE.tiny, 16))
 	if entry.label ~= "" then
@@ -161,6 +162,7 @@ function status.bar(width)
 			end
 		end
 		local ink = running > 0 and "accent" or "quiet"
+		local jobs_level = hover_glow("jobs")
 		right:child(
 			b.div()
 				:row()
@@ -171,7 +173,7 @@ function status.bar(width)
 				:rounded(4)
 				:no_shrink()
 				:press("jobs")
-				:bg(hovered("jobs") and alpha("foreground", 0.06) or nil)
+				:bg(jobs_level > 0 and alpha("foreground", 0.06 * jobs_level) or nil)
 				:child(running > 0 and P.disc("accent", 9, false) or icon("circle-check", 12, "quiet"))
 				:child(T(running > 0 and (running .. " running") or (#S.jobs .. " done"), ink, SIZE.small))
 		)

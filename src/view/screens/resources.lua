@@ -18,7 +18,7 @@ local unix_now = model_containers.unix_now
 local PANEL, marked, plain_rows, row_tops =
 	model_rows.PANEL, model_rows.marked, model_rows.plain_rows, model_rows.row_tops
 local S = model_state.S
-local P, T, hovered = parts_ui.P, parts_ui.T, parts_ui.hovered
+local P, T, hover_glow, lit, toward = parts_ui.P, parts_ui.T, parts_ui.hover_glow, parts_ui.lit, parts_ui.toward
 
 local screens = {}
 
@@ -97,7 +97,7 @@ local function table_screen(section, spec, width)
 		local id = "row:" .. row.id
 		local cursor = S.cursor[section] == row.id
 		local on = S.marks[section] and S.marks[section][row.id]
-		local el = parts_table.row(tracks, id, cursor, hovered(id), on)
+		local el = parts_table.row(tracks, id, cursor, hover_glow(id), on)
 		el:child(parts_table.lead(row.id, on, nil, spec.lead_of and spec.lead_of(row.item) or spec.lead))
 		for _, cell in ipairs(spec.cells(row.item, width, context)) do
 			el:child(cell)
@@ -128,16 +128,14 @@ local function layers_panel(image, width)
 		used:child(T("used by", "quiet", SIZE.small + 1))
 		for _, name in ipairs(image.containers) do
 			local id = "img:open:" .. name
+			local level = hover_glow(id)
 			used:child(
-				b.div()
-					:row()
-					:items_center()
-					:h(22)
-					:px(8)
-					:rounded(11)
-					:press(id)
-					:bg(hovered(id) and "raised3" or "raised2")
-					:child(T(name, hovered(id) and "foreground" or "dim", SIZE.small))
+				toward(
+					b.div():row():items_center():h(22):px(8):rounded(11):press(id):bg("raised2"),
+					level,
+					"raised3",
+					11
+				):child(T(name, lit(level) and "foreground" or "dim", SIZE.small))
 			)
 		end
 		body:child(used)

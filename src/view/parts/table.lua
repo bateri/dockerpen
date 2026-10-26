@@ -8,7 +8,7 @@ local parts_ui = require("./ui")
 local alpha, b = lib_kit.alpha, lib_kit.b
 local SIZE = lib_sizes.SIZE
 local S = model_state.S
-local P, T, chosen, hovered = parts_ui.P, parts_ui.T, parts_ui.chosen, parts_ui.hovered
+local P, T, chosen, hover_glow, lit = parts_ui.P, parts_ui.T, parts_ui.chosen, parts_ui.hover_glow, parts_ui.lit
 
 local table_part = {}
 
@@ -28,7 +28,12 @@ function table_part.head(tracks, columns, sorted)
 			cell:press(id)
 		end
 		cell:child(
-			T(string.upper(column.label), (active or (id and hovered(id))) and "dim" or "quiet", SIZE.tiny + 0.5, 500):truncate()
+			T(
+				string.upper(column.label),
+				(active or (id and lit(hover_glow(id)))) and "dim" or "quiet",
+				SIZE.tiny + 0.5,
+				500
+			):truncate()
 		)
 		if active then
 			cell:child(P.icon("chevron-down", 11, "dim"))
@@ -38,15 +43,16 @@ function table_part.head(tracks, columns, sorted)
 	return b.div():col():no_shrink():child(row):child(b.div():h(1):bg(alpha("border", 0.6)))
 end
 
--- A row: the grid the head has, framed as the cursor, a mark or the pointer say.
-function table_part.row(tracks, id, cursor, over, marked_on)
+-- A row: the grid the head has, framed as the cursor, a mark or the pointer say (`level`: how far
+-- the pointer's highlight has come, 0 to 1).
+function table_part.row(tracks, id, cursor, level, marked_on)
 	local el = b.div():grid(tracks):gap_x(10):items_center():h(SIZE.row):px(8):rounded(6):press(id):no_shrink()
 	if cursor then
 		chosen(el, true)
 	elseif marked_on then
 		el:bg(alpha("accent", 0.09))
-	elseif over then
-		el:bg(alpha("foreground", 0.06))
+	elseif level > 0 then
+		el:bg(alpha("foreground", 0.06 * level))
 	end
 	return el
 end
@@ -59,7 +65,7 @@ function table_part.lead(row_id, marked_on, mark, name)
 	end
 	if name == "chevron-right" or name == "chevron-down" then
 		return cell:press("layers:toggle:" .. row_id)
-			:child(P.icon(name, 13, hovered("layers:toggle:" .. row_id) and "foreground" or "quiet"))
+			:child(P.icon(name, 13, lit(hover_glow("layers:toggle:" .. row_id)) and "foreground" or "quiet"))
 	end
 	return cell:child(P.icon(name, 13, "quiet"))
 end
