@@ -82,8 +82,9 @@ local function fresh_news()
 end
 
 -- What stands at the end of a section's row: the containers with something to look at, news in the
--- activity, a job running, how many there are, or the key that goes to it.
-local function trailing(section, keys, active)
+-- activity, a job running, or how many there are. Never the key that goes to it: a number there is
+-- always a count (the key is in the section's tip).
+local function trailing(section, active)
 	local count_role = active and "dim" or "quiet"
 	if section.id == "containers" then
 		local issues = counts().issues
@@ -105,13 +106,12 @@ local function trailing(section, keys, active)
 	elseif S.lists[section.id] then
 		return T(tostring(#S.lists[section.id]), count_role, SIZE.small)
 	end
-	-- The key is always there, seen as far as the pointer over the rail brings it in.
-	return T(section.key, alpha("quiet", keys), SIZE.tiny + 0.5)
+	return nil
 end
 
 -- A section's row: its ground is the pointer's (the one that is on show has the pill, which
 -- `rail.column` moves under it).
-local function item(section, compact, keys)
+local function item(section, compact)
 	local id = "sec:" .. section.id
 	local active = S.section == section.id
 	local el = b.div():press(id):row():items_center():gap(10):h(ITEM):rounded(6):no_shrink()
@@ -126,7 +126,7 @@ local function item(section, compact, keys)
 	end
 	local ink = active and "foreground" or blend("dim", "foreground", level)
 	el:child(icon(section.icon, 15, ink))
-	local end_of = trailing(section, keys, active)
+	local end_of = trailing(section, active)
 	if compact then
 		if end_of and (section.id == "containers" or section.id == "activity") then
 			-- A dot at the corner says there is news.
@@ -202,24 +202,9 @@ local function engine_card()
 end
 
 -- The rail, as wide as `width` allows: its icons alone where that is the compact width.
--- Whether the pointer is over the rail, anywhere on it (between its rows too), as the page last laid it
--- out: the keys of the sections show then.
-function rail.pointer_over()
-	local at, box = S.pointer, b.layout.bounds("rail")
-	return at ~= nil
-		and box ~= nil
-		and at.x >= box.x
-		and at.x < box.x + box.w
-		and at.y >= box.y
-		and at.y < box.y + box.h
-end
-
 function rail.column(compact)
-	-- The keys come in while the pointer is anywhere over the rail and go when it leaves, as the web
-	-- page's did; only the sections with no count or news of their own show one.
-	local keys = glow("rail.keys", rail.pointer_over())
 	local width = compact and SIZE.rail_compact or SIZE.rail
-	local col = b.div():id("rail"):col():w(width):no_shrink():gap(GAP):px(8):pt(TOP):pb(8):bg("raised1")
+	local col = b.div():col():w(width):no_shrink():gap(GAP):px(8):pt(TOP):pb(8):bg("raised1")
 	local shown = nil
 	for index, section in ipairs(SECTIONS) do
 		if section.id == S.section then
@@ -231,7 +216,7 @@ function rail.column(compact)
 		col:child(pill_to(shown))
 	end
 	for _, section in ipairs(SECTIONS) do
-		col:child(item(section, compact, keys))
+		col:child(item(section, compact))
 	end
 	col:child(b.spacer())
 	if not compact then
