@@ -109,9 +109,7 @@ function ran() {
 
 test("the page is shown the view and the program says what it is", () => {
   const told = pane({ calls: [["boot"]] });
-  // Either kit: CI builds with the pencere CLI that tools/pencere-version names, which offers lua
-  // 1.0 until it is raised to a release with kit 2.0; then this is 2.0 alone.
-  assert.match(told.log, /program: open id=\d+ view=lua version=[12]\.0 title="Docker"/);
+  assert.match(told.log, /program: open id=\d+ view=lua version=2\.0 title="Docker"/);
   assert.match(told.log, /view: title="Docker" program="dockerpen"/);
   assert.match(told.log, /view: icons png 32x32 dark,png 64x64 dark,png 32x32 light,png 64x64 light/);
   const [boot] = told.calls.boot;
