@@ -2,3 +2,4 @@ dist/
 .pencere/
 .scratch/
 .DS_Store
+.cache/

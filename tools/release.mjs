@@ -8,6 +8,8 @@
 //   rehearse            everything a release of the prepared version checks, on any branch
 //   notes [<version>]   the CHANGELOG section of a version
 //   version             the version dockerpen says it is (src/program/version.lua)
+//   pencere-version     the version of the released pencere a release is built with (the release
+//                       tag in tools/pencere-ref), or a refusal while that file names a commit
 //
 // In the release workflow (.github/workflows/release.yml), after the gate is green on main:
 //
@@ -80,6 +82,27 @@ const LUA_VERSION = join(root, "src", "program", "version.lua");
 function versionOf() {
   const version = /return "([^"]+)"/.exec(readFileSync(LUA_VERSION, "utf8"))?.[1];
   if (version === undefined) refuse("src/program/version.lua does not say a version");
+  return version;
+}
+
+/** The pencere dockerpen is built and tested with: a commit of it, or the tag of a release. */
+const PENCERE_REF = join(root, "tools", "pencere-ref");
+const PENCERE_RELEASE = /^cli-v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/;
+
+/**
+ * The version of the `pencere` command a release is built with: the release tools/pencere-ref
+ * names. A commit is what the gate is held to while pencere has no release of the kit dockerpen is
+ * written for, and nothing to release with: the command of an older release would fetch runners that
+ * a terminal of the newer kit does not open.
+ */
+function pencereVersion() {
+  const ref = readFileSync(PENCERE_REF, "utf8").trim();
+  const version = PENCERE_RELEASE.exec(ref)?.[1];
+  if (version === undefined) {
+    refuse(
+      `tools/pencere-ref is ${ref}, a commit of pencere and not a release of it (cli-v<version>): a release is built with a released pencere and its runners, so there is none until the file names one`,
+    );
+  }
   return version;
 }
 
@@ -208,6 +231,7 @@ function releaseState(tag) {
 
 /** Everything a release of the prepared version checks, on any branch: what `make rehearse` runs. */
 function rehearse() {
+  pencereVersion();
   const { version, tag } = versionChecks();
   if (tagExists(tag)) refuse(`the tag ${tag} exists`);
   console.log(`${NAME} ${version} is ready to be released as ${tag}`);
@@ -263,6 +287,7 @@ function plan() {
     console.error(`${tagOf(version)} exists: nothing to release`);
     release = false;
   } else {
+    pencereVersion();
     const { tag } = versionChecks();
     if (tagExists(tag)) {
       if (!tagIsHead(tag)) refuse(`${tag} is on another commit: a tag is never moved`);
@@ -487,6 +512,10 @@ function version() {
   console.log(versionOf());
 }
 
+function pencereVersionCommand() {
+  console.log(pencereVersion());
+}
+
 const COMMANDS = {
   prepare,
   rehearse,
@@ -497,6 +526,7 @@ const COMMANDS = {
   publish,
   notes,
   version,
+  "pencere-version": pencereVersionCommand,
 };
 
 const [command, ...args] = process.argv.slice(2);

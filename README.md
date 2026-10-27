@@ -160,25 +160,28 @@ program. Its files cross the stream once; after that the terminal keeps them.
 
 You need Node 22 (for the tests and the release tools only: dockerpen has no Node in it),
 [StyLua](https://github.com/JohnnyMorganz/StyLua) (`cargo install stylua --locked --features luau`),
-and a checkout of [pencere](https://github.com/bateri/pencere) beside this one, built there:
-
-```sh
-cargo build --release -p pencere-cli     # the `pencere` command, the runner of the program
-cargo build -p pencere-fake-host         # the stand-in terminal the tests play dockerpen in
-```
+git and Rust: dockerpen is built and tested with [pencere](https://github.com/bateri/pencere) at the
+commit or release tag in `tools/pencere-ref`, which `make` fetches into `.cache/pencere` and builds
+there the first time it needs it (its `pencere` command, the runner of the program, and the
+stand-in terminal the tests play dockerpen in).
 
 ```sh
 git clone https://github.com/bateri/dockerpen && cd dockerpen
 make check          # formatting, the program built, the page's tests, and dist/dockerpen
                     # in a pane under pencere-fake-host with a stand-in docker
 make fmt            # format the Lua
-pencere dev         # in a pane of a terminal that hosts pencere: run it from its files,
+make dev            # in a pane of a terminal that hosts pencere: run it from its files,
                     # and again when one under src/ changes (print goes to .pencere/log)
 ```
 
-`make` looks for the runner at `../pencere/target/release/pencere`, the stand-in terminal at
-`../pencere/target/debug/pencere-fake-host` and the kit's page API at
-`../pencere/kit/luau/prelude`; `PENCERE=`, `FAKE_HOST=` and `PRELUDE=` say where else.
+To work against another checkout of pencere, one you are changing, name it: `make` builds it and
+takes all three from it (and says so when it is not at `tools/pencere-ref`), and never looks for
+one on its own:
+
+```sh
+make dev PENCERE_SRC=../pencere
+make check PENCERE_SRC=../pencere
+```
 
 What the tests are:
 

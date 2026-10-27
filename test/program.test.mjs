@@ -2,8 +2,8 @@
 // terminal, and a stand-in `docker` (test/fixtures/bin/docker) first on the PATH: the page's calls
 // and topics travel to the program through the tty as they do in bateri, and what the page was
 // told is read off the host's record. The program is the built file, `dist/dockerpen`
-// (`make build`); DOCKERPEN_BIN names another. The host is the one built in a pencere checkout
-// beside this one (`cargo build -p pencere-fake-host`); PENCERE_FAKE_HOST names another.
+// (`make build`); DOCKERPEN_BIN names another. The host is PENCERE_FAKE_HOST, the one the Makefile
+// builds in its pencere (FAKE_HOST): run it with `make test-binary`.
 //
 // Nothing here runs the machine's own Docker: the commands that change things are the stand-in's
 // and the commands it was given are in the log it keeps (STANDIN_LOG).
@@ -18,19 +18,19 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
 
-const HOST = process.env.PENCERE_FAKE_HOST
-  ? resolve(process.env.PENCERE_FAKE_HOST)
-  : new URL("../../pencere/target/debug/pencere-fake-host", import.meta.url).pathname;
+const HOST = process.env.PENCERE_FAKE_HOST ? resolve(process.env.PENCERE_FAKE_HOST) : undefined;
 const BIN = process.env.DOCKERPEN_BIN
   ? resolve(process.env.DOCKERPEN_BIN)
   : new URL("../dist/dockerpen", import.meta.url).pathname;
 const STAND_IN = new URL("./fixtures/bin", import.meta.url).pathname;
 
-const missing = !existsSync(HOST)
-  ? `pencere-fake-host is not built (${HOST}): cargo build -p pencere-fake-host in a pencere checkout, then PENCERE_FAKE_HOST=<it>`
-  : !existsSync(BIN)
-    ? `the program is not built (${BIN}): run make build`
-    : undefined;
+const missing = HOST === undefined
+  ? "PENCERE_FAKE_HOST names no stand-in terminal: make test-binary"
+  : !existsSync(HOST)
+    ? `pencere-fake-host is not built (${HOST}): make test-binary`
+    : !existsSync(BIN)
+      ? `the program is not built (${BIN}): run make build`
+      : undefined;
 if (missing !== undefined) {
   throw new Error(`the end-to-end tests cannot run: ${missing}`);
 }

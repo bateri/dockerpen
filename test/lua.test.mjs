@@ -2,8 +2,10 @@
 // API. They run in pencere's runner (the Lua there is), packed with src/program/ into a program of
 // their own: test/lua/main.lua is its entry. The page is held to the kit by loading the kit's own
 // prelude (PENCERE_PRELUDE, a pencere checkout's kit/luau/prelude), the Lua a terminal gives a page.
+// Both are the pencere the Makefile is given (PENCERE, PRELUDE): run it with `make test-page`.
 //
-// Nothing here is skipped: a runner or a prelude that is not there fails the run and says which.
+// Nothing here is skipped: a runner or a prelude that is not named, or not there, fails the run and
+// says which.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -12,12 +14,11 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
 
-const PENCERE = process.env.PENCERE
-  ? resolve(process.env.PENCERE)
-  : new URL("../../pencere/target/release/pencere", import.meta.url).pathname;
-const PRELUDE = process.env.PENCERE_PRELUDE
-  ? resolve(process.env.PENCERE_PRELUDE)
-  : new URL("../../pencere/kit/luau/prelude", import.meta.url).pathname;
+if (!process.env.PENCERE || !process.env.PENCERE_PRELUDE) {
+  throw new Error("the Lua tests cannot run: PENCERE and PENCERE_PRELUDE name no pencere: make test-page");
+}
+const PENCERE = resolve(process.env.PENCERE);
+const PRELUDE = resolve(process.env.PENCERE_PRELUDE);
 const PROGRAM = new URL("../src/program", import.meta.url).pathname;
 const TESTS = new URL("./lua", import.meta.url).pathname;
 const PAGE = new URL("../src/view/page.lua", import.meta.url).pathname;

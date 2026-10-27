@@ -6,8 +6,13 @@ Mac file, because bateri runs on Apple silicon only. People install it with `ins
 README).
 
 Each file is pencere's Lua runner for one target with dockerpen packed into it. `make dist` makes
-all three with the `pencere` command of the version in `tools/pencere-version`, which fetches each
-target's runner from its own release. To build with a newer pencere, change that file.
+all three with the released `pencere` command of the release `tools/pencere-ref` names
+(`cli-v<version>`), which fetches each target's runner from its own release. The gate tests
+against the same pencere, so to build with a newer one, change that file.
+
+While pencere has no release of the kit dockerpen is written for, `tools/pencere-ref` names a commit
+of it. The gate is held to that commit, and there is no release: the workflow's plan, `make
+rehearse` and `make dist` refuse until the file names a release.
 
 ## Versions and the changelog
 
@@ -38,6 +43,7 @@ finished by running the workflow by hand on `main` (**Run workflow**, or
 
 ### What the checks refuse
 
+- a `tools/pencere-ref` that names a commit of pencere, not a release of it;
 - a version that is not after the last, or a `version.lua` that disagrees with the changelog;
 - a non-empty `## [Unreleased]`, or an empty release section;
 - a commit whose gate is not green, a tag on another commit, or a release that is public already;

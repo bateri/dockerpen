@@ -2,10 +2,11 @@
 # finished green on a push to main, and when it is started by hand:
 #
 # - plan: whether the version in src/program/version.lua has no tag yet (`make release-prepare`,
-#   committed and pushed). A commit that moved no version ends here.
-# - build: the three files, made by the `pencere` command of tools/pencere-version, which fetches
-#   the runner of each target from its own release and checks it there: no target's toolchain, one
-#   runner. They are summed, checked and attested (provenance).
+#   committed and pushed). A commit that moved no version ends here. While tools/pencere-ref names
+#   a commit of pencere and not a release of it, plan refuses: there is no pencere to release with.
+# - build: the three files, made by the released `pencere` command of the release tools/pencere-ref
+#   names, which fetches the runner of each target from its own release and checks it there: no
+#   target's toolchain, one runner. They are summed, checked and attested (provenance).
 # - draft: the tag `v<version>` and the GitHub release as a draft, with the changelog section as its
 #   notes and the files.
 # - publish: waits in the `release` environment for a maintainer to approve it, refuses an
@@ -105,7 +106,8 @@ jobs:
           node-version: 22
       - name: Install the pencere command
         run: |
-          PENCERE_VERSION="$(cat tools/pencere-version)" PENCERE_INSTALL="$RUNNER_TEMP/pencere" \
+          version="$(node tools/release.mjs pencere-version)"
+          PENCERE_VERSION="$version" PENCERE_INSTALL="$RUNNER_TEMP/pencere" \
             sh -c "$(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/bateri/pencere/main/cli/install.sh)"
       - run: make dist PENCERE="$RUNNER_TEMP/pencere/pencere"
       - if: needs.plan.outputs.rehearse != 'true'
