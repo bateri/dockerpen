@@ -374,14 +374,11 @@ local function handle(event)
 		end
 		result = moved
 	elseif kind == "scrolled" then
-		-- The host scrolled boxes of the page, and moved the rows made with them: a long list is made
-		-- again only where what is in view comes near the end of them, and a log is followed again
-		-- once it is at its end, and no longer once it is not.
+		-- The host scrolled boxes of the page, and moved the rows made with them (the kit makes a long
+		-- list again where what is in view comes near the end of them): a log is followed again once
+		-- it is at its end, and no longer once it is not.
 		local moved = false
 		for _, box in ipairs(event.boxes) do
-			if lib_virtual.stale(box.id, box.y) then
-				moved = true
-			end
 			if box.id == "log" then
 				local follow, new_since = L.follow, L.new_since
 				local extent = b.layout.scroll_extent("log")

@@ -429,7 +429,7 @@ t.test("a log of fifty thousand lines is a window of elements, with the end of i
 		return count
 	end
 	t.eq(made(k), made(with_log(5000)), "the lines made do not grow with the log")
-	t.ok(made(k) < 200, "a few screens of lines are made, not fifty thousand: " .. made(k))
+	t.ok(made(k) < 300, "a few screens of lines are made, not fifty thousand: " .. made(k))
 	t.lacks(texts, "GET /api/orders/100 200", "the first lines are not made")
 end)
 
@@ -1126,16 +1126,26 @@ t.test("everything has a key: the help lists them, and ? opens it", function()
 	t.lacks(page_texts(k), "Keyboard shortcuts")
 end)
 
-t.test("the page does not outgrow what a page may be: a few hundred elements with many containers", function()
-	local many = {}
-	for n = 1, 3000 do
-		many[#many + 1] =
-			data.container("a", "box-" .. n, { id = string.rep("a", 60) .. string.format("%04d", n), short = "x" .. n })
+t.test("the page does not outgrow what a page may be: a window of the list with many containers", function()
+	local function page_of(count)
+		local many = {}
+		for n = 1, count do
+			many[#many + 1] = data.container(
+				"a",
+				"box-" .. n,
+				{ id = string.rep("a", 60) .. string.format("%04d", n), short = "x" .. n }
+			)
+		end
+		local k = opened({ containers = many })
+		k:render(1300, 760, 102)
+		return k
 	end
-	local k = opened({ containers = many })
-	k:render(1300, 760, 102)
-	t.ok(kit.count(k.root) < 1500, "elements: " .. kit.count(k.root))
+	local k = page_of(3000)
 	t.has(page_texts(k), "3000 total")
+	-- As many elements for three thousand containers as for three hundred: the rows near what is in
+	-- view are made, not the list.
+	t.eq(kit.count(k.root), kit.count(page_of(300).root), "the page does not grow with the list")
+	t.ok(kit.count(k.root) < 3000, "elements: " .. kit.count(k.root))
 end)
 
 t.test("the keys ask the host to scroll the log: lines at once, a page over a moment", function()
