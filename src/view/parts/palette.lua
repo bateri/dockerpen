@@ -91,8 +91,7 @@ function part.view()
 	)
 	box:child(b.div():h(1):bg(alpha("border", 0.5)):no_shrink())
 	local tops, total = layout_of(list)
-	local scroll =
-		b.div():col():id("palette.list"):h(math.min(total + 12, most)):scroll_y(ui:scroll_offset("palette.list")):p(6)
+	local scroll = b.div():col():id("palette.list"):h(math.min(total + 12, most)):scroll():p(6)
 	if #list == 0 then
 		scroll:child(b.div():col():items_center():pt(22):pb(22):child(T("Nothing is called that.", "dim", SIZE.body)))
 	end
@@ -135,11 +134,11 @@ function part.view()
 		p.reveal = false
 		local view = math.min(total + 12, most) - 12
 		local top = tops[p.active] or 0
-		local offset = ui:scroll_offset("palette.list")
+		local offset = lib_kit.offset("palette.list")
 		if top - GROUP < offset then
-			ui:set_scroll("palette.list", math.max(top - GROUP, 0))
+			lib_kit.scroll_to("palette.list", math.max(top - GROUP, 0))
 		elseif top + ITEM > offset + view then
-			ui:set_scroll("palette.list", top + ITEM - view)
+			lib_kit.scroll_to("palette.list", top + ITEM - view)
 		end
 	end
 	box:child(scroll)

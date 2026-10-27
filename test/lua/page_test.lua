@@ -424,11 +424,10 @@ end)
 
 t.test("scrolling up stops following, and the lines that come are counted", function()
 	local k = with_log(2000)
-	-- The terminal knows how far the log reaches; the page is told by what it asks of the layout.
+	-- The terminal knows how far the log reaches and scrolls it; the page is told where it went.
 	k.extents.log = { content = 34000, view = 560 }
-	k.hit_id = "log"
-	k:event({ type = "scroll", x = 900, y = 300, dy = -400 })
-	k.hit_id = nil
+	k:move_to("log", 0, 34000)
+	k:wheel("log", 0, -400)
 	k:push("logs", data.log_batch(2001, 30))
 	k:render(1300, 760, 107)
 	t.has(page_texts(k), "30 new lines")
@@ -1091,4 +1090,17 @@ t.test("the page does not outgrow what a page may be: a few hundred elements wit
 	k:render(1300, 760, 102)
 	t.ok(kit.count(k.root) < 1500, "elements: " .. kit.count(k.root))
 	t.has(page_texts(k), "3000 total")
+end)
+
+t.test("the keys ask the host to scroll the log: lines at once, a page over a moment", function()
+	local k = with_log(2000)
+	k.extents.log = { content = 34000, view = 560 }
+	k:move_to("log", 0, 20000)
+	k:event({ type = "scrolled", boxes = { { id = "log", x = 0, y = 20000 } } })
+	k:key("k")
+	t.eq(k.asks[#k.asks].id, "log")
+	t.eq(k.asks[#k.asks].animate, false, "three lines up, at once")
+	t.ok(k.offsets.log.y < 20000, "up")
+	k:key("page_up")
+	t.eq(k.asks[#k.asks].animate, true, "a page, as the Mac's views go one")
 end)

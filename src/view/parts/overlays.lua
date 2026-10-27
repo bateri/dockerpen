@@ -270,14 +270,7 @@ function overlays.help()
 			)
 		end
 	end
-	card:child(
-		b.div()
-			:col()
-			:id("help.scroll")
-			:h(math.max(math.min(S.height - 200, 480), 120))
-			:scroll_y(ui:scroll_offset("help.scroll"))
-			:child(grid)
-	)
+	card:child(b.div():col():id("help.scroll"):h(math.max(math.min(S.height - 200, 480), 120)):scroll():child(grid))
 	return over(card, "help:backdrop", math.min(math.floor(S.height * 0.12), 80))
 end
 

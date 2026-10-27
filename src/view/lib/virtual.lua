@@ -38,12 +38,12 @@ end
 local function virtual(id, count, height, make, options)
 	options = options or {}
 	local tops = options.tops
-	local offset = ui:scroll_offset(id)
+	local offset = lib_kit.offset(id)
 	local view = views[id] or 480
 	local lead = options.lead or 0
 	local first = math.max(1, row_at(offset - lead, count, height, tops) - OVERSCAN)
 	local last = math.min(count, row_at(offset + view - lead, count, height, tops) + OVERSCAN)
-	local box = b.div():col():id(id):grow(1):min_h(0):scroll_y(offset):px(options.px or 8)
+	local box = b.div():col():id(id):grow(1):min_h(0):scroll():px(options.px or 8)
 	if options.pt then
 		box:pt(options.pt)
 	end
@@ -71,11 +71,11 @@ local function reveal(id, index, count, height, lead, tops)
 	local start, tall = place(index, height, tops)
 	local top = lead + start
 	local bottom = top + tall
-	local offset = ui:scroll_offset(id)
+	local offset = lib_kit.offset(id)
 	if top - (index == 1 and lead or 0) < offset then
-		ui:set_scroll(id, math.max(top - (index == 1 and lead or 0), 0))
+		lib_kit.scroll_to(id, math.max(top - (index == 1 and lead or 0), 0))
 	elseif bottom + (index == count and 8 or 0) > offset + view then
-		ui:set_scroll(id, math.max(bottom + (index == count and 8 or 0) - view, 0))
+		lib_kit.scroll_to(id, math.max(bottom + (index == count and 8 or 0) - view, 0))
 	end
 end
 
