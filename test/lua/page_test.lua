@@ -418,7 +418,18 @@ t.test("a log of fifty thousand lines is a window of elements, with the end of i
 		end
 	end
 	t.ok(found, "the last line is on show while it follows")
-	t.ok(kit.count(k.root) < 700, "the page is a few hundred elements, not fifty thousand: " .. kit.count(k.root))
+	-- The lines made are a window at the end: as many of fifty thousand as of five thousand.
+	local made = function(page)
+		local count = 0
+		for _, text in ipairs(page_texts(page)) do
+			if string.find(text, "GET /api/orders/", 1, true) then
+				count += 1
+			end
+		end
+		return count
+	end
+	t.eq(made(k), made(with_log(5000)), "the lines made do not grow with the log")
+	t.ok(made(k) < 200, "a few screens of lines are made, not fifty thousand: " .. made(k))
 	t.lacks(texts, "GET /api/orders/100 200", "the first lines are not made")
 end)
 
@@ -595,6 +606,41 @@ t.test("inspect is the engine's answer, a line at a time", function()
 	local texts = page_texts(k)
 	t.has(texts, '        "Id"')
 	t.has(texts, ": ")
+end)
+
+-- The engine's answer about a container, a thousand lines long.
+local function with_long_inspect()
+	local k = opened()
+	k:key("down")
+	k:key("enter")
+	k:render(1300, 760, 102)
+	local long = {}
+	for key, value in pairs(data.detail) do
+		long[key] = value
+	end
+	long.lines = {}
+	for n = 1, 1000 do
+		long.lines[n] = '  "Key' .. n .. '": ' .. n
+	end
+	k:answer("detail", long)
+	k:key("i")
+	k.extents["detail.inspect"] = { content = 12 + 1000 * 19 + 8, view = 480 }
+	k:render(1300, 760, 103)
+	k:settle()
+	k:render(1300, 760, 104)
+	return k
+end
+
+t.test("a long answer is made as it is scrolled to, and not at every turn of the wheel", function()
+	local k = with_long_inspect()
+	t.has(page_texts(k), '  "Key1"')
+	t.lacks(page_texts(k), '  "Key600"', "the lines far below are not made")
+	local reply = k:wheel("detail.inspect", 0, 38)
+	t.eq(reply.redraw, false, "two lines down: the host moved the lines made, and nothing is made again")
+	reply = k:wheel("detail.inspect", 0, 600 * 19)
+	t.eq(reply.redraw, true, "far down: past the lines made")
+	k:render(1300, 760, 105)
+	t.has(page_texts(k), '  "Key600"', "and the lines there are made")
 end)
 
 t.test("why a container stopped, in words", function()
