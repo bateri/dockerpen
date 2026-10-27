@@ -248,7 +248,7 @@ function mouse.click(id, mods)
 			L.runs, L.run_count = {}, 0
 		elseif rest == "only" then
 			L.only = not L.only
-			ui:set_scroll("log", 0)
+			lib_kit.scroll_to("log", 0)
 		elseif rest == "clear" then
 			log_wipe()
 		elseif rest == "copy" then

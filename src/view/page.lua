@@ -278,9 +278,9 @@ local function on_text(text)
 		-- What is looked for in the palette: the first of what it finds is the one it is on.
 		S.palette.active = 1
 		S.palette.reveal = true
-		ui:set_scroll("palette.list", 0)
+		lib_kit.scroll_to("palette.list", 0)
 	elseif S.field == "list" then
-		ui.scroll.list = nil
+		lib_kit.scroll_to("list", 0)
 		keep_cursor(S.section)
 	end
 end
@@ -361,23 +361,32 @@ local function handle(event)
 		end
 		result = true
 	elseif kind == "scroll" then
+		-- What of the wheel no box the host scrolls took: across, a log's lines move under it (they
+		-- are not a box that scrolls across).
 		S.pointer = { x = event.x, y = event.y }
-		local dx, dy = event.dx or 0, event.dy or 0
-		local moved = ui:scroll_by(b.layout, event, dx, dy)
+		local dx = event.dx or 0
 		local over_log = S.section == "containers" and S.open and S.tab == "logs"
+		local moved = false
 		if over_log and dx ~= 0 then
-			-- Across, a log's lines move under it (they are not a box that scrolls across).
 			local was = L.hscroll
 			L.hscroll = math.max(math.floor(L.hscroll + dx), 0)
-			moved = moved or L.hscroll ~= was
+			moved = L.hscroll ~= was
 		end
-		if moved and over_log and dy ~= 0 then
-			if dy < 0 then
-				L.follow = false
-			else
-				local view = views.log or 400
-				if ui:scroll_offset("log") >= log_total() + 8 - view - 2 then
+		result = moved
+	elseif kind == "scrolled" then
+		-- The host scrolled boxes of the page: a long list builds the rows at its new place, and a
+		-- log is followed again once it is at its end, and no longer once it is not.
+		local moved = false
+		for _, box in ipairs(event.boxes) do
+			if box.id == "list" or box.id == "log" then
+				moved = true
+			end
+			if box.id == "log" then
+				local extent = b.layout.scroll_extent("log")
+				if extent and box.y >= extent.max_offset - 2 then
 					L.follow, L.new_since = true, 0
+				else
+					L.follow = false
 				end
 			end
 		end
@@ -413,7 +422,7 @@ local function handle(event)
 end
 
 local function settle()
-	local moved = ui:settle(b.layout)
+	local moved = false
 	for _, id in ipairs({ "list", "log", "detail.inspect", "detail.scroll", "system.scroll", "help.scroll" }) do
 		local extent = b.layout.scroll_extent(id)
 		if extent and views[id] ~= extent.view then

@@ -172,7 +172,7 @@ local function scan_log(budget)
 	if not L.pinned_match and #matches > 0 and L.match_at ~= #matches then
 		L.match_at = #matches
 		L.follow = false
-		ui:set_scroll("log", math.max(log_top(matches[#matches]) - (views.log or 400) / 2, 0))
+		lib_kit.scroll_to("log", math.max(log_top(matches[#matches]) - (views.log or 400) / 2, 0))
 	end
 	return L.scanned < L.count
 end
@@ -259,7 +259,7 @@ local function log_tab(c, width)
 	end
 	local view = views.log or 400
 	if L.follow and not searching then
-		ui:set_scroll("log", math.max(log_total() + 4 - view, 0))
+		lib_kit.scroll_to("log", math.max(log_total() + 4 - view, 0))
 	end
 	local current = L.matches[L.match_at]
 	if searching then

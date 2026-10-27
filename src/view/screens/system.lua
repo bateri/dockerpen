@@ -157,9 +157,7 @@ function screens.system(width)
 		end
 		body:child(card)
 	end
-	return col:child(
-		b.div():col():id("system.scroll"):grow(1):min_h(0):scroll_y(ui:scroll_offset("system.scroll")):child(body)
-	)
+	return col:child(b.div():col():id("system.scroll"):grow(1):min_h(0):scroll():child(body))
 end
 
 return {

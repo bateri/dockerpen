@@ -102,9 +102,10 @@ function keys.palette(key, mods)
 	return true
 end
 
--- Scrolls a scrolling box by `dy`, in points.
+-- Scrolls a scrolling box by `dy`, in points: a page of it over a moment, as the Mac's views go a
+-- page, a line at once.
 local function scroll_by(id, dy)
-	ui:set_scroll(id, math.max(ui:scroll_offset(id) + dy, 0))
+	lib_kit.scroll_to(id, lib_kit.offset(id) + dy, math.abs(dy) > 100)
 end
 
 -- Keys over a log: it scrolls, follows, is searched.
@@ -129,7 +130,7 @@ local function log_keys(key, mods)
 		scroll_by("log", page)
 	elseif key == "home" or key == "g" then
 		L.follow = false
-		ui:set_scroll("log", 0)
+		lib_kit.scroll_to("log", 0)
 	elseif key == "end" or key == "G" or key == "F" and false then
 		L.follow, L.new_since = true, 0
 	elseif key == "t" then
@@ -155,7 +156,7 @@ local function log_keys(key, mods)
 			at = (at - 2) % total + 1
 		end
 		L.match_at, L.follow, L.pinned_match = at, false, true
-		ui:set_scroll("log", math.max(log_top(L.matches[at]) - view / 2, 0))
+		lib_kit.scroll_to("log", math.max(log_top(L.matches[at]) - view / 2, 0))
 	elseif key == "L" then
 		if L.tail < LOG_MOST then
 			L.tail = math.min(L.tail * 5, LOG_MOST)
@@ -182,9 +183,9 @@ local function detail_scroll_keys(key)
 	elseif key == "page_down" then
 		scroll_by(id, view - 40)
 	elseif key == "home" or key == "g" then
-		ui:set_scroll(id, 0)
+		lib_kit.scroll_to(id, 0)
 	elseif key == "end" or key == "G" then
-		ui:set_scroll(id, 1e9)
+		lib_kit.scroll_to(id, 1e9)
 	else
 		return nil
 	end
@@ -439,9 +440,9 @@ function keys.system(key)
 	elseif key == "page_down" then
 		scroll_by("system.scroll", 300)
 	elseif key == "home" then
-		ui:set_scroll("system.scroll", 0)
+		lib_kit.scroll_to("system.scroll", 0)
 	elseif key == "end" then
-		ui:set_scroll("system.scroll", 1e9)
+		lib_kit.scroll_to("system.scroll", 1e9)
 	else
 		return nil
 	end

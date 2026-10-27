@@ -776,13 +776,7 @@ function screens.detail(width, beside)
 		content = overview(c, width)
 	end
 	panel:child(
-		b.div()
-			:col()
-			:id("detail.scroll")
-			:grow(1)
-			:min_h(0)
-			:scroll_y(ui:scroll_offset("detail.scroll"))
-			:child(b.div():col():no_shrink():child(content))
+		b.div():col():id("detail.scroll"):grow(1):min_h(0):scroll():child(b.div():col():no_shrink():child(content))
 	)
 	return panel
 end

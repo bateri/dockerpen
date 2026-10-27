@@ -213,8 +213,8 @@ end
 function go.open(id, focus)
 	if S.open ~= id then
 		S.open, S.open_at = id, S.now
-		ui.scroll["detail.scroll"] = nil
-		ui.scroll["detail.inspect"] = nil
+		lib_kit.scroll_to("detail.scroll", 0)
+		lib_kit.scroll_to("detail.inspect", 0)
 		S.show_labels = false
 	end
 	if focus then
@@ -235,7 +235,7 @@ function go.section(id)
 	S.section = id
 	S.layer_open = nil
 	S.focus = "list"
-	ui.scroll.list = nil
+	lib_kit.scroll_to("list", 0)
 	bump()
 	keep_cursor(id)
 	S.reveal = true
@@ -244,7 +244,7 @@ end
 function go.tab(id)
 	if S.tab ~= id then
 		S.tab = id
-		ui.scroll["detail.scroll"] = nil
+		lib_kit.scroll_to("detail.scroll", 0)
 		bump()
 	end
 	if S.open then
