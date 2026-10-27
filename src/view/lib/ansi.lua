@@ -58,6 +58,8 @@ function ansi.runs(text)
 	if not ansi.has(text) then
 		return { { text = text } }
 	end
+	-- A link, a title: what `ansi.strip` takes away, and is not in a line's words.
+	text = string.gsub(text, "\27%][^\7\27]*[\7\27]\\?", "")
 	local runs = {}
 	local style = {}
 	local at = 1

@@ -9,10 +9,17 @@ local parts_ui = require("../parts/ui")
 local alpha, b, ui = lib_kit.alpha, lib_kit.b, lib_kit.ui
 local ansi = lib_ansi.ansi
 local fmt = lib_fmt.fmt
-local LOG_MOST, SIZE = lib_sizes.LOG_MOST, lib_sizes.SIZE
+local LOG_BAR_ONE_LINE, LOG_MOST, SIZE = lib_sizes.LOG_BAR_ONE_LINE, lib_sizes.LOG_MOST, lib_sizes.SIZE
 local views, virtual = lib_virtual.views, lib_virtual.virtual
-local L, log_live, log_top, log_tops, log_total =
-	model_log.L, model_log.log_live, model_log.log_top, model_log.log_tops, model_log.log_total
+local L, LOG_LEAD, log_live, log_match_tops, log_searching, log_show_match, log_tops, log_total =
+	model_log.L,
+	model_log.LOG_LEAD,
+	model_log.log_live,
+	model_log.log_match_tops,
+	model_log.log_searching,
+	model_log.log_show_match,
+	model_log.log_tops,
+	model_log.log_total
 local S = model_state.S
 local P, T = parts_ui.P, parts_ui.T
 
@@ -66,6 +73,18 @@ local LOG_TEXT = SIZE.small + 1
 -- The room of the time of a line: "12:34:56.789", twelve characters of the log's size.
 local TIME_W = math.ceil(12 * LOG_TEXT * CHAR) + 2
 
+-- The wheel across a log, `dx` points: its lines are read that much further to the right (or back
+-- to their start), while they run on past its width; where they wrap there is nothing to the right.
+-- Whether what is on show moved.
+local function shift_log(dx)
+	if L.wrap then
+		return false
+	end
+	local was = math.floor(L.hscroll)
+	L.hscroll = math.max(L.hscroll + dx / (LOG_TEXT * CHAR), 0)
+	return math.floor(L.hscroll) ~= was
+end
+
 -- The runs of a line cut into rows of `cols` characters.
 local function wrap_runs(runs, cols)
 	local rows, row, used = {}, {}, 0
@@ -75,7 +94,8 @@ local function wrap_runs(runs, cols)
 		local from = 1
 		while length > 0 do
 			local take = math.min(length, cols - used)
-			local cut = utf8.offset(text, take + 1) or (#text + 1)
+			-- The character `take` on from where this row's part starts, not from the start of the run.
+			local cut = utf8.offset(text, take + 1, from) or (#text + 1)
 			row[#row + 1] = { text = string.sub(text, from, cut - 1), fg = run.fg, bold = run.bold, dim = run.dim }
 			from, length, used = cut, length - take, used + take
 			if used >= cols and length > 0 then
@@ -107,8 +127,9 @@ local function log_line(index, current, cols)
 	local matched = L.query_on and L.match_set and L.match_set[index]
 	local shown = log_runs(index)
 	local rows
-	if L.hscroll > 0 and not L.wrap then
-		shown = shift_runs(shown, L.hscroll)
+	local shift = L.wrap and 0 or math.floor(L.hscroll)
+	if shift > 0 then
+		shown = shift_runs(shown, shift)
 	end
 	if L.wrap and cols then
 		rows = wrap_runs(shown, cols)
@@ -137,7 +158,7 @@ local function log_line(index, current, cols)
 					:child(position == 1 and T(L.clocks[index] or "", "quiet", LOG_TEXT):no_shrink() or b.div())
 			)
 		end
-		if position == 1 and L.hscroll > 0 and not L.wrap then
+		if position == 1 and shift > 0 then
 			row:child(T("‹", "quiet", SIZE.small + 0.5):no_shrink())
 		end
 		row:child(words_of(runs))
@@ -170,9 +191,7 @@ local function scan_log(budget)
 	-- Until the person goes through the matches, the one on show is the latest: what a log is
 	-- searched for is most often what happened last.
 	if not L.pinned_match and #matches > 0 and L.match_at ~= #matches then
-		L.match_at = #matches
-		L.follow = false
-		lib_kit.scroll_to("log", math.max(log_top(matches[#matches]) - (views.log or 400) / 2, 0))
+		log_show_match(#matches)
 	end
 	return L.scanned < L.count
 end
@@ -202,33 +221,85 @@ local function switch(id, label, on)
 		:child(T(label, over and "foreground" or "dim", SIZE.body))
 end
 
--- The bar over a log: the search and what it found, then what the log shows and does: following,
--- the time of each line, wrapping; clearing the view, copying it, following it in the terminal.
--- Where there is no room for all of it, the verbs go to a second line, as they wrapped.
+-- The way through what the search found: which of them is on show and how many there are (a `+`
+-- while the log is still being looked through), the one before it and the one after (round from the
+-- last to the first), and whether the log shows only them.
+local function find_controls()
+	local total = #L.matches
+	local more = L.scanned < L.count
+	local note
+	if total == 0 then
+		note = more and "…" or "No match"
+	else
+		note = string.format("%d/%d", math.max(L.match_at, 1), total) .. (more and "+" or "")
+	end
+	local none = total == 0
+	-- The count is as wide as a long one, so the arrows do not move as it grows.
+	local count =
+		b.div():row():justify_end():min_w(58):pr(4):no_shrink():child(T(note, none and "quiet" or "dim", SIZE.small))
+	return b.div()
+		:row()
+		:items_center()
+		:gap(2)
+		:no_shrink()
+		:child(count)
+		:child(P.icon_button("l:prev", "arrow-up", {
+			label = "Previous match",
+			tip = "Previous match",
+			keys = "N",
+			disabled = none,
+		}))
+		:child(P.icon_button("l:next", "arrow-down", {
+			label = "Next match",
+			tip = "Next match",
+			keys = "n",
+			disabled = none,
+		}))
+		:child(P.icon_button("l:only", "list-filter", {
+			label = "Only the lines that match",
+			tip = "Only the lines that match",
+			selected = L.only,
+		}))
+end
+
+-- A thin upright line between the parts of a bar.
+local function divider()
+	return b.div():w(1):h(16):ml(4):mr(4):bg(alpha("border", 0.7)):no_shrink()
+end
+
+-- The bar over a log: the search and the way through what it found; then what the log shows
+-- (following, the time of each line, wrapping) and what is done with it (cleared, copied, followed in
+-- the terminal). All on one line where the log is wide enough for all of it, the search with what it
+-- found included, else the switches and the verbs on a second line: whether there is a search does
+-- not move the log down a line as the person starts to type.
 local function log_toolbar(width)
-	local narrow = width < 620
+	local one_line = width >= LOG_BAR_ONE_LINE
 	local bar = b.div():col():no_shrink()
 	local top = b.div():row():items_center():gap(4):h(44):px(10):no_shrink()
-	top:child(P.field(S.field == "logs", "Find in logs", nil))
+	top:child(P.field(S.field == "logs", "Find in logs", nil, 140))
 	if L.query_on and S.query ~= "" then
-		local total = #L.matches
-		local note = total == 0 and (L.scanned < L.count and "…" or "no match")
-			or (string.format("%d/%d", math.max(L.match_at, 1), total) .. (L.scanned < L.count and "+" or ""))
-		top:child(T(note, total == 0 and "quiet" or "dim", SIZE.small):no_shrink():min_w(54))
-		top:child(switch("l:only", "only", L.only))
+		top:child(find_controls())
 	end
-	top:child(switch("l:follow", "follow", L.follow))
-	top:child(switch("l:time", "time", L.timestamps))
-	top:child(switch("l:wrap", "wrap", L.wrap))
-	local verbs = top
 	bar:child(top)
-	if narrow then
-		verbs = b.div():row():items_center():gap(4):h(24):px(10):mb(8):no_shrink()
-		bar:child(verbs)
+	local rest = top
+	if one_line then
+		top:child(divider())
+	else
+		-- At the narrowest the end of it is cut, not run off the side of the page.
+		rest = b.div():row():items_center():gap(4):h(30):px(10):mb(6):no_shrink():clip()
+		bar:child(rest)
 	end
-	verbs:child(P.icon_button("l:clear", "eraser", { icon_size = 13 }))
-	verbs:child(P.icon_button("l:copy", "copy", { icon_size = 13 }))
-	verbs:child(P.icon_button("d:follow", "arrow-right-left", { icon_size = 13 }))
+	rest:child(switch("l:follow", "follow", L.follow))
+	rest:child(switch("l:time", "time", L.timestamps))
+	rest:child(switch("l:wrap", "wrap", L.wrap))
+	if one_line then
+		rest:child(divider())
+	else
+		rest:child(b.spacer())
+	end
+	rest:child(P.icon_button("l:clear", "eraser", { icon_size = 13 }))
+	rest:child(P.icon_button("l:copy", "copy", { icon_size = 13 }))
+	rest:child(P.icon_button("d:follow", "arrow-right-left", { icon_size = 13 }))
 	bar:child(b.div():h(1):bg(alpha("border", 0.6)):no_shrink())
 	return bar
 end
@@ -249,27 +320,17 @@ local function log_tab(c, width)
 	local cols =
 		math.max(math.floor((width - 2 - 10 - 12 - (L.timestamps and (TIME_W + 10) or 0)) / (LOG_TEXT * CHAR)), 10)
 	L.cols = cols
-	local searching = L.only and L.query_on and S.query ~= ""
-	local tops = nil
-	local count = L.count
-	if searching then
-		count = #L.matches
-	else
-		tops = log_tops(cols)
-	end
 	local view = views.log or 400
-	if L.follow and not searching then
-		lib_kit.scroll_to("log", math.max(log_total() + 4 - view, 0))
-	end
 	local current = L.matches[L.match_at]
-	if searching then
-		box:child(virtual("log", count, SIZE.line, function(index)
+	if log_searching() then
+		-- The lines it found alone, each as tall as it is wrapped.
+		box:child(virtual("log", #L.matches, SIZE.line, function(index)
 			return log_line(L.matches[index], L.matches[index] == current, cols)
-		end, { px = 0, pt = 4, trail = 10 }))
+		end, { px = 0, pt = LOG_LEAD, tops = log_match_tops(cols), trail = 10 }))
 	else
-		box:child(virtual("log", count, SIZE.line, function(index)
+		box:child(virtual("log", L.count, SIZE.line, function(index)
 			return log_line(index, index == current, cols)
-		end, { px = 0, pt = 4, tops = tops, trail = 10 }))
+		end, { px = 0, pt = LOG_LEAD, tops = log_tops(cols), trail = 10, at_end = L.follow }))
 	end
 	-- Back to the end: a pill over the foot of the log, while it is not followed and there is more
 	-- of it than the window shows.
@@ -315,4 +376,5 @@ end
 return {
 	log_tab = log_tab,
 	scan_log = scan_log,
+	shift_log = shift_log,
 }

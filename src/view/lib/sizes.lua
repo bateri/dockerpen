@@ -25,6 +25,9 @@ local RAIL_FROM = 480 -- below this the sections are a strip across the top
 local LIST_NARROW = 470 -- no memory below this
 local LIST_MEDIUM = 660 -- no image below this, and
 local LIST_WIDE = 860 -- no ports below this
+-- The width of a log (the detail's room) from which its bar is one line: the search, the way through
+-- what it found, the switches and the verbs. Below it the switches and the verbs are a second line.
+local LOG_BAR_ONE_LINE = 720
 
 local SECTIONS = {
 	{ id = "containers", label = "Containers", key = "1", icon = "boxes" },
@@ -68,6 +71,7 @@ return {
 	LIST_MEDIUM = LIST_MEDIUM,
 	LIST_NARROW = LIST_NARROW,
 	LIST_WIDE = LIST_WIDE,
+	LOG_BAR_ONE_LINE = LOG_BAR_ONE_LINE,
 	LOG_MOST = LOG_MOST,
 	LOG_TAIL = LOG_TAIL,
 	PROCESSES_MOST = PROCESSES_MOST,

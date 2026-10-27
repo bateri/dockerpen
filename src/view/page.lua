@@ -27,7 +27,9 @@ local SIZE = lib_sizes.SIZE
 local reveal, views = lib_virtual.reveal, lib_virtual.views
 local on_containers, on_events, on_jobs = model_feed.on_containers, model_feed.on_events, model_feed.on_jobs
 local load_list, load_system = model_lists.load_list, model_lists.load_system
-local L, log_total = model_log.L, model_log.log_total
+local L, log_step_match, log_total = model_log.L, model_log.log_step_match, model_log.log_total
+-- The keys that go through what a log's search found while the words are in the field, and which way.
+local FIND_STEPS = { enter = 1, down = 1, up = -1 }
 local field_context, go, persist, restore, row_menu, sync =
 	model_nav.field_context, model_nav.go, model_nav.persist, model_nav.restore, model_nav.row_menu, model_nav.sync
 local net, why = model_net.net, model_net.why
@@ -39,7 +41,7 @@ local palette_part = parts_palette
 local rail = parts_rail
 local status = parts_status
 local overlays = parts_overlays.overlays
-local scan_log = screens_logs.scan_log
+local scan_log, shift_log = screens_logs.scan_log, screens_logs.shift_log
 
 -- The screens: each file of screens/ says what it can show, by name.
 local screens = {}
@@ -368,9 +370,7 @@ local function handle(event)
 		local over_log = S.section == "containers" and S.open and S.tab == "logs"
 		local moved = false
 		if over_log and dx ~= 0 then
-			local was = L.hscroll
-			L.hscroll = math.max(math.floor(L.hscroll + dx), 0)
-			moved = L.hscroll ~= was
+			moved = shift_log(dx)
 		end
 		result = moved
 	elseif kind == "scrolled" then
@@ -395,6 +395,14 @@ local function handle(event)
 		if S.typing and S.palette and (event.key == "up" or event.key == "down") then
 			-- In the palette the arrows choose while the words stay in the field.
 			result = keys.palette(event.key, event.mods)
+		elseif S.typing and S.field == "logs" and #L.matches > 0 and FIND_STEPS[event.key] then
+			-- In a log's search ⏎ and ↓ go to the next match, ⇧⏎ and ↑ to the one before, while the
+			-- words stay in the field. With nothing found they leave it, as they do elsewhere.
+			local step = FIND_STEPS[event.key]
+			if event.key == "enter" and event.mods and event.mods.shift then
+				step = -1
+			end
+			result = log_step_match(step)
 		elseif S.typing then
 			-- A key the field gives the page (⏎, Esc, ⇥, an arrow): it leaves the field without a word,
 			-- and the next key is the page's.

@@ -447,6 +447,97 @@ t.test("scrolling up stops following, and the lines that come are counted", func
 	t.lacks(page_texts(k), "30 new lines")
 end)
 
+-- What the page last asked the host of the box `id`.
+local function last_ask(k, id)
+	for index = #k.asks, 1, -1 do
+		if k.asks[index].id == id then
+			return k.asks[index]
+		end
+	end
+	return nil
+end
+
+t.test("a followed log is held at the end of its box, and the host's word of it keeps it followed", function()
+	local k = with_log(2000)
+	-- The box as the terminal lays it out: the lines, and the room above and below them.
+	k.extents.log = { content = 4 + 2000 * 18 + 10, view = 560 }
+	k:settle()
+	k:push("logs", data.log_batch(2001, 30))
+	k.extents.log.content += 30 * 18
+	k:render(1300, 760, 107)
+	t.ok(last_ask(k, "log").y >= k.extents.log.content - 560, "the page asks for the end of the box")
+	t.eq(k.offsets.log.y, k.extents.log.content - 560, "and the host is there")
+	-- The host tells the page where the box went, as it does of every box it moved.
+	k:event({ type = "scrolled", boxes = { { id = "log", x = 0, y = k.offsets.log.y } } })
+	k:render(1300, 760, 108)
+	t.lacks(page_texts(k), "Follow", "it is still followed: there is no way back to the end to offer")
+	k:wheel("log", 0, -200)
+	k:render(1300, 760, 109)
+	t.has(page_texts(k), "Follow", "scrolled up, it is not")
+end)
+
+t.test("the room kept for the lines of a log not made is what they take wrapped, tabs and all", function()
+	local k = with_log(1)
+	-- Three tabs and sixty characters: within the sixty-five a row of the log has room for as they are
+	-- written, past them as they are shown (a tab is four spaces), so two rows each.
+	local texts, clocks = {}, {}
+	for n = 1, 2000 do
+		texts[n], clocks[n] = "\t\t\t" .. string.rep("x", 60), ""
+	end
+	k:push("logs", { texts = texts, clocks = clocks, streams = string.rep("o", 2000), last = "2026-10-25T10:00:00Z" })
+	k:render(1300, 760, 107)
+	-- The room above the lines made (the 4 above the first line, and the lines not made), the lines
+	-- made at the end of the log, the room below them.
+	local kids = kit.find(k.root, "log").kids
+	local made = #kids - 2
+	t.ok(made < 2000, "the lines made are a window: " .. made)
+	t.eq(kids[2].style.height, 2 * 18, "a line made is two rows")
+	t.eq(kids[1].style.height, 4 + 18 + (2000 - made) * 2 * 18, "and so is each of those above it, as room")
+end)
+
+t.test("a long line is wrapped into rows that hold all of it", function()
+	local k = with_log(1)
+	-- A hundred and fifty characters: rows of sixty-five, sixty-five and twenty.
+	local long = string.rep("0123456789", 15)
+	k:push("logs", { texts = { long }, clocks = { "" }, streams = "o", last = "2026-10-25T10:00:00Z" })
+	k:render(1300, 760, 107)
+	local texts = page_texts(k)
+	t.has(texts, string.sub(long, 1, 65))
+	t.has(texts, string.sub(long, 66, 130), "the second row goes on where the first stopped")
+	t.has(texts, string.sub(long, 131, 150), "and the last holds the rest")
+end)
+
+t.test("a link in a log is its words", function()
+	local k = with_log(1)
+	local linked = "see \27]8;;https://example.com/guide\27\\the guide\27]8;;\27\\ first"
+	k:push("logs", { texts = { linked }, clocks = { "" }, streams = "o", last = "2026-10-25T10:00:00Z" })
+	k:render(1300, 760, 107)
+	t.has(page_texts(k), "see the guide first")
+	t.lacks(page_texts(k), "example.com")
+end)
+
+t.test("the wheel across reads a log to the right a character for its width, and not while it wraps", function()
+	local k = with_log(20)
+	local function first_words()
+		for _, text in ipairs(page_texts(k)) do
+			if string.find(text, "/20 200", 1, true) then
+				return text
+			end
+		end
+		return ""
+	end
+	local reply = k:event({ type = "scroll", x = 900, y = 400, dx = 40, dy = 0 })
+	t.eq(reply.redraw, false, "the lines wrap: there is nothing to the right of them")
+	k:key("w")
+	k:render(1300, 760, 107)
+	t.eq(first_words(), "  GET /api/orders/20 200", "and they are read from their start once they do not")
+	-- Six characters of the log's size, and a little.
+	reply = k:event({ type = "scroll", x = 900, y = 400, dx = 6 * 12 * 0.62 + 1, dy = 0 })
+	t.eq(reply.redraw, true)
+	k:render(1300, 760, 108)
+	t.eq(first_words(), "GET /api/orders/20 200", "six characters, across the two runs the line is in")
+end)
+
 t.test("the log is searched through the host's field, and n goes to the next match", function()
 	local k = with_log(1000)
 	k:render(1300, 760, 107)
@@ -462,6 +553,142 @@ t.test("the log is searched through the host's field, and n goes to the next mat
 	k:key("N")
 	k:render(1300, 760, 116)
 	t.has(page_texts(k), "9/10")
+end)
+
+-- A log searched for "ERROR": the field has the keyboard, and the search has found its ten.
+local function searched_log()
+	local k = with_log(1000)
+	k:render(1300, 760, 107)
+	k:key("/")
+	k:text("ERROR")
+	for step = 1, 6 do
+		k:render(1300, 760, 107 + step)
+	end
+	return k
+end
+
+-- The elements from the root down to the one named `id`.
+local function path_to(root, id)
+	local path = {}
+	local function walk(element)
+		path[#path + 1] = element
+		if element.meta and element.meta.id == id then
+			return true
+		end
+		for _, child in ipairs(element.kids or {}) do
+			if walk(child) then
+				return true
+			end
+		end
+		path[#path] = nil
+		return false
+	end
+	assert(walk(root), "nothing on the page is named " .. id)
+	return path
+end
+
+-- Whether the element named `a` stands on the line of the one named `b`: the box that holds `b`
+-- holds `a` too. (`b` is the one of its name on the page; another box can share `a`'s.)
+local function on_one_line(root, a, b)
+	local to_b = path_to(root, b)
+	return kit.find(to_b[#to_b - 1], a) ~= nil
+end
+
+t.test("a searched log's bar keeps to its width, with the way through what it found", function()
+	local k = searched_log()
+	local pressable = kit.pressables(k.root)
+	t.ok(pressable["l:prev"] and pressable["l:next"] and pressable["l:only"], "the one before, after, and only them")
+	t.ok(not on_one_line(k.root, "field", "l:follow"), "a narrow log has its switches under the search")
+	k:render(2000, 760, 114)
+	t.ok(on_one_line(k.root, "field", "l:follow"), "a wide one has them beside it")
+	k:text("")
+	k:render(1300, 760, 115)
+	t.ok(not kit.pressables(k.root)["l:prev"], "no search, no way through it")
+	t.ok(not on_one_line(k.root, "field", "l:follow"), "and the bar keeps its shape as a search begins and ends")
+end)
+
+t.test("⏎ and the arrows in a log's search go through the matches, and the words stay in the field", function()
+	local k = searched_log()
+	t.has(page_texts(k), "10/10")
+	local reply = k:key("enter")
+	t.ok(reply.keyboard ~= "page", "the field keeps the keyboard")
+	k:render(1300, 760, 114)
+	t.has(page_texts(k), "1/10", "⏎ goes on, and round")
+	k:key("up")
+	k:render(1300, 760, 115)
+	t.has(page_texts(k), "10/10", "↑ goes back")
+	k:key("enter", { shift = true })
+	k:render(1300, 760, 116)
+	t.has(page_texts(k), "9/10", "and ⇧⏎")
+	k:key("down")
+	k:render(1300, 760, 117)
+	t.has(page_texts(k), "10/10", "↓ goes on")
+	k:click("l:prev")
+	k:render(1300, 760, 118)
+	t.has(page_texts(k), "9/10", "and the buttons")
+	k:click("l:next")
+	k:render(1300, 760, 119)
+	t.has(page_texts(k), "10/10")
+end)
+
+t.test("with only the matches on show, n goes to a match among them, as tall as it is wrapped", function()
+	local k = with_log(1)
+	-- Every twentieth line is a long error, four rows wrapped; the rest are short.
+	local texts, clocks = {}, {}
+	for n = 1, 200 do
+		texts[n] = n % 20 == 0 and ("ERROR " .. string.rep("x", 200)) or ("INFO line " .. n)
+		clocks[n] = ""
+	end
+	k:push("logs", { texts = texts, clocks = clocks, streams = string.rep("o", 200), last = "2026-10-25T10:00:00Z" })
+	k:render(1300, 760, 107)
+	k:text("ERROR")
+	for step = 1, 4 do
+		k:render(1300, 760, 107 + step)
+	end
+	k:click("l:only")
+	k:render(1300, 760, 112)
+	t.has(page_texts(k), "10/10")
+	-- How tall a match is: the list is the room above them, the ten, and the room below.
+	local tall = 0
+	for _, kid in ipairs(kit.find(k.root, "log").kids) do
+		tall += kid.style.height or 0
+	end
+	tall = (tall - 4 - 10) / 10
+	t.ok(tall > 18, "a match takes rows: " .. tall)
+	for _ = 1, 5 do
+		k:key("n")
+	end
+	local fifth = last_ask(k, "log").y
+	k:key("n")
+	t.eq(last_ask(k, "log").y - fifth, tall, "the next is a match further down, not twenty lines of the log")
+end)
+
+t.test("with only the matches on show, the room kept for those not made is what they take wrapped", function()
+	local k = with_log(1)
+	local texts, clocks = {}, {}
+	for n = 1, 2000 do
+		texts[n] = n % 20 == 0 and ("ERROR " .. string.rep("x", 200)) or ("INFO line " .. n)
+		clocks[n] = ""
+	end
+	k:push("logs", { texts = texts, clocks = clocks, streams = string.rep("o", 2000), last = "2026-10-25T10:00:00Z" })
+	k:render(1300, 760, 107)
+	k:text("ERROR")
+	k:render(1300, 760, 108)
+	k:render(1300, 760, 109)
+	k:click("l:only")
+	k:render(1300, 760, 110)
+	k:settle()
+	k:render(1300, 760, 111)
+	local kids = kit.find(k.root, "log").kids
+	local made = #kids - 2
+	t.ok(made > 0 and made < 100, "the hundred matches are a window of them: " .. made)
+	local tall = kids[2].style.height
+	t.ok(tall > 18, "a match takes rows: " .. tall)
+	local whole = 0
+	for _, kid in ipairs(kids) do
+		whole += kid.style.height or 0
+	end
+	t.eq(whole, 4 + 100 * tall + 10, "the room above, the hundred as tall as they are, the room below")
 end)
 
 t.test("a log is read to the right, a few characters at a time", function()

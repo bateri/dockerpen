@@ -1,6 +1,11 @@
+local lib_ansi = require("../lib/ansi")
+local lib_kit = require("../lib/kit")
 local lib_sizes = require("../lib/sizes")
+local lib_virtual = require("../lib/virtual")
 local model_state = require("./state")
+local ansi = lib_ansi.ansi
 local LOG_MOST, SIZE = lib_sizes.LOG_MOST, lib_sizes.SIZE
+local views = lib_virtual.views
 local S = model_state.S
 
 -- ---- a container's log -----------------------------------------------------------------------------
@@ -63,17 +68,29 @@ local function log_wipe()
 	L.last, L.wrap, L.timestamps, L.only = last, wrap, timestamps, only
 end
 
--- How many rows of `cols` characters a line takes where it wraps.
+-- How many rows of `cols` characters a line takes where it wraps: the characters it is shown in
+-- (`ansi.runs`: a tab is four spaces, an escape none), or the rows it is made of and the room the
+-- list keeps for it are not the same.
 local function line_rows(text, cols)
-	if #text <= cols then
+	local tabs = string.find(text, "\t", 1, true)
+	if #text <= cols and not tabs then
 		return 1
 	end
-	local plain = text
-	if string.find(text, "\27", 1, true) then
-		plain = string.gsub(text, "\27%[[%d;:]*%a", "")
+	local plain = ansi.strip(text)
+	if tabs then
+		plain = string.gsub(plain, "\t", "    ")
 	end
 	local length = utf8.len(plain) or #plain
 	return math.max(1, math.ceil(length / cols))
+end
+
+-- Lines wrap at the width of the log, or run on past it to be read to the right: what was made for
+-- the one is made again, and the lines are read from their start.
+local function log_toggle_wrap()
+	L.wrap = not L.wrap
+	L.tops = nil
+	L.runs, L.run_count = {}, 0
+	L.hscroll = 0
 end
 
 -- Where each line starts, in points, when they wrap at `cols` characters (and are `SIZE.line` a row):
@@ -109,6 +126,72 @@ local function log_total()
 	return L.count * SIZE.line
 end
 
+-- The room above the first line of the log, in its list.
+local LOG_LEAD = 4
+
+-- Whether the log shows only the lines its search found (they are then the rows of its list).
+local function log_searching()
+	return L.only and L.query_on and S.query ~= ""
+end
+
+-- Where each line the search found starts in the list of them alone, when the lines wrap at `cols`
+-- characters: each as tall as it is in the whole log. Kept as the matches come, and made again for
+-- another search or width. `nil` where they do not wrap (they are then a row each).
+local function log_match_tops(cols)
+	local whole = log_tops(cols)
+	if whole == nil then
+		return nil
+	end
+	if L.mtops == nil or L.mtops_of ~= L.matches or L.mtops_cols ~= cols then
+		L.mtops, L.mtops_of, L.mtops_cols, L.mtops_n = { 0 }, L.matches, cols, 0
+	end
+	local tops, matches = L.mtops, L.matches
+	for at = L.mtops_n + 1, #matches do
+		local index = matches[at]
+		tops[at + 1] = tops[at] + (whole[index + 1] - whole[index])
+	end
+	L.mtops_n = #matches
+	return tops
+end
+
+-- Shows match `at` (of `L.matches`) in the middle of the log, where it is in the list on show.
+local function log_show_match(at)
+	local index = L.matches[at]
+	if index == nil then
+		return
+	end
+	local top, tall
+	if log_searching() then
+		local tops = L.cols and log_match_tops(L.cols)
+		top = tops and tops[at] or (at - 1) * SIZE.line
+		tall = tops and tops[at + 1] - tops[at] or SIZE.line
+	else
+		top = log_top(index)
+		tall = log_top(index + 1) - top
+	end
+	L.match_at, L.follow = at, false
+	local view = views.log or 400
+	lib_kit.scroll_to("log", math.max(LOG_LEAD + top + tall / 2 - view / 2, 0))
+end
+
+-- Goes `step` matches on (1) or back (-1), round from the last to the first: the person goes through
+-- them, and the latest no longer takes the search's place. Whether there was one to go to.
+local function log_step_match(step)
+	local total = #L.matches
+	if total == 0 then
+		return false
+	end
+	local at = L.match_at
+	if at < 1 then
+		at = step > 0 and 1 or total
+	else
+		at = (at - 1 + step) % total + 1
+	end
+	L.pinned_match = true
+	log_show_match(at)
+	return true
+end
+
 -- Whether the container of the log on show is running (a log of one that stopped does not go on).
 local function log_live()
 	local c = L.id and S.by_id[L.id]
@@ -117,8 +200,14 @@ end
 
 return {
 	L = L,
+	LOG_LEAD = LOG_LEAD,
 	line_rows = line_rows,
 	log_clear = log_clear,
+	log_match_tops = log_match_tops,
+	log_searching = log_searching,
+	log_show_match = log_show_match,
+	log_step_match = log_step_match,
+	log_toggle_wrap = log_toggle_wrap,
 	log_top = log_top,
 	log_tops = log_tops,
 	log_total = log_total,

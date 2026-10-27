@@ -6,6 +6,7 @@ local lib_icons = require("../lib/icons")
 local lib_kit = require("../lib/kit")
 local lib_sizes = require("../lib/sizes")
 local model_act = require("../model/act")
+local model_log = require("../model/log")
 local model_rows = require("../model/rows")
 local model_state = require("../model/state")
 local parts_ui = require("./ui")
@@ -13,6 +14,7 @@ local alpha, b = lib_kit.alpha, lib_kit.b
 local icon = lib_icons.icon
 local SIZE = lib_sizes.SIZE
 local act = model_act.act
+local L, log_step_match = model_log.L, model_log.log_step_match
 local marked, targets = model_rows.marked, model_rows.targets
 local S = model_state.S
 local P, T, blend, hover_glow = parts_ui.P, parts_ui.T, parts_ui.blend, parts_ui.hover_glow
@@ -73,6 +75,36 @@ local function container_hints()
 	return list
 end
 
+-- What the keys do over a log: where its search found something, the way through it (⏎ while the
+-- words are in the field, n out of it), then what the log shows.
+local function log_hints()
+	local function step(by)
+		return function()
+			log_step_match(by)
+		end
+	end
+	local found = L.query_on and S.query ~= "" and #L.matches > 0
+	if found and S.typing then
+		return {
+			{ keys = "⏎", label = "next", run = step(1) },
+			{ keys = "⇧⏎", label = "previous", run = step(-1) },
+			{ keys = "esc", label = "done" },
+		}
+	end
+	local list = {}
+	if found then
+		list[#list + 1] = { keys = "n", label = "next match", run = step(1) }
+		list[#list + 1] = { keys = "N", label = "previous", run = step(-1) }
+	end
+	list[#list + 1] = { keys = "space", label = "follow" }
+	list[#list + 1] = { keys = "/", label = "find" }
+	list[#list + 1] = { keys = "t", label = "time" }
+	list[#list + 1] = { keys = "w", label = "wrap" }
+	list[#list + 1] = { keys = "[ ]", label = "tabs" }
+	list[#list + 1] = { keys = "esc", label = "back" }
+	return list
+end
+
 -- The keys that do something where the person is.
 local function hints()
 	if S.dialog then
@@ -87,14 +119,7 @@ local function hints()
 		return { { keys = "↑↓", label = "choose" }, { keys = "esc", label = "close" } }
 	elseif S.section == "containers" then
 		if S.open and S.focus == "detail" and S.tab == "logs" then
-			return {
-				{ keys = "space", label = "follow" },
-				{ keys = "/", label = "find" },
-				{ keys = "t", label = "time" },
-				{ keys = "w", label = "wrap" },
-				{ keys = "[ ]", label = "tabs" },
-				{ keys = "esc", label = "back" },
-			}
+			return log_hints()
 		end
 		return container_hints()
 	elseif S.section == "system" then

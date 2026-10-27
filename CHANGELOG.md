@@ -15,8 +15,32 @@ change what the previous one did.
   the wheel.
 - Inspect scrolled past its first screen showed nothing below until something else on the page
   changed: the lines that came into view were not made as it scrolled.
+- Wrapping cut a long line of a log at the width of the log instead of carrying it on: the row
+  under it was kept for the rest, and left empty.
+- A followed log stays followed: it was taken to a little short of its end, which the page then
+  read as being scrolled up, so following stopped as soon as a line came (the Follow button
+  flickered in and out, and took a few presses to hold).
+- Wrapped lines with tabs (a stack trace) took more rows than the log kept room for, so the lines
+  jumped as the log scrolled; a link a program writes into its log is now its words, not the
+  escape around them.
+- The wheel or trackpad across a log moves its lines a character for each character's width,
+  not a character for each point, so a scroll up or down no longer throws them sideways; and it
+  does nothing while they wrap, where it used to leave them shifted for when wrapping was turned
+  off. Turning wrapping off shows the lines from their start.
+- Searching a log no longer pushes the end of its bar off the side of the detail: where the detail
+  is narrow, the switches and the verbs stand on a line under the search, with a search or without
+  one, so the log does not move down as you start to type.
+- With only the matching lines on show, `n` and `N` go to the match among them, where they went to
+  its place in the whole log; and a match that wraps takes the rows it needs there, where the rows
+  ran into each other.
 
 ### Changed
+
+- The way through what a log's search found: beside the count, ↑ and ↓ go to the match before and
+  after (round from the last to the first), and a filter button shows only the lines that match.
+  In the field ⏎ and ↓ go to the next match and ⇧⏎ and ↑ to the one before, the words staying in
+  the field (esc leaves it); out of it `n` and `N` do, and the line of keys says so. Showing only
+  the matches, or all the lines again, keeps the match on show where it is.
 
 - dockerpen's page is held to pencere kit 2.0: the gate builds the `pencere` command from the
   same pencere commit as its stand-in terminal and prelude, and the Lua test host offers the drag

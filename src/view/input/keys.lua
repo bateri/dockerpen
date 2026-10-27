@@ -22,7 +22,8 @@ local toast = model_toast.toast
 local dialog = model_dialog.dialog
 local palette = model_palette.palette
 local DISK = model_disk.DISK
-local L, log_clear, log_top, on_log = model_log.L, model_log.log_clear, model_log.log_top, model_log.on_log
+local L, log_clear, log_step_match, log_toggle_wrap, on_log =
+	model_log.L, model_log.log_clear, model_log.log_step_match, model_log.log_toggle_wrap, model_log.on_log
 local ask_clean, ask_pull, current_container, cursor_row, field_context, go, step =
 	model_nav.ask_clean,
 	model_nav.ask_pull,
@@ -136,27 +137,14 @@ local function log_keys(key, mods)
 	elseif key == "t" then
 		L.timestamps = not L.timestamps
 	elseif key == "w" then
-		L.wrap = not L.wrap
-		L.tops = nil
-		L.runs, L.run_count = {}, 0
+		log_toggle_wrap()
 	elseif key == "space" or key == " " then
 		L.follow = not L.follow
 		if L.follow then
 			L.new_since = 0
 		end
 	elseif key == "n" or key == "N" then
-		local total = #L.matches
-		if total == 0 then
-			return false
-		end
-		local at = L.match_at
-		if key == "n" then
-			at = at % total + 1
-		else
-			at = (at - 2) % total + 1
-		end
-		L.match_at, L.follow, L.pinned_match = at, false, true
-		lib_kit.scroll_to("log", math.max(log_top(L.matches[at]) - view / 2, 0))
+		return log_step_match(key == "n" and 1 or -1)
 	elseif key == "L" then
 		if L.tail < LOG_MOST then
 			L.tail = math.min(L.tail * 5, LOG_MOST)

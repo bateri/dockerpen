@@ -214,6 +214,7 @@ function P.button(id, label, o)
 end
 
 -- A button that is an icon alone, as the verbs on a row are: quiet until the pointer is over it.
+-- `label`, `tip` and `keys` say what it does where its icon alone does not.
 function P.icon_button(id, name, o)
 	o = o or {}
 	return P.button(id, nil, {
@@ -223,6 +224,9 @@ function P.icon_button(id, name, o)
 		icon_size = o.icon_size or 12,
 		disabled = o.disabled,
 		selected = o.selected,
+		label = o.label,
+		tip = o.tip,
+		keys = o.keys,
 	})
 end
 

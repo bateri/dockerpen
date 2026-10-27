@@ -18,7 +18,7 @@ end
 
 -- A list of `count` rows, of which the ones in view and those around them are made (`make(index)`).
 -- `options`: `tops` (the rows are not all of one `height`), `lead` (room before the first),
--- `px`, `pt`, `trail`.
+-- `px`, `pt`, `trail`, and `at_end` (the list is held at its end, as a log that is followed).
 local function virtual(id, count, height, make, options)
 	options = options or {}
 	-- Where the rows stand: the list's tops while they are the tops of `count` rows, else rows of one
@@ -27,6 +27,11 @@ local function virtual(id, count, height, make, options)
 	local tops = options.tops
 	local rows = tops and #tops == count + 1 and b.Rows.from_tops(tops) or b.Rows.even(count, height)
 	rows:padded((options.pt or 0) + (options.lead or 0), options.trail or 8)
+	if options.at_end then
+		-- The host is asked for past the end, which is the end of the box as it is laid out (the room
+		-- around the rows and all), and the kit makes the last rows, where the list is going.
+		lib_kit.scroll_to(id, rows:total())
+	end
 	return b.div():col():id(id):grow(1):min_h(0):scroll():px(options.px or 8):list(rows, make)
 end
 

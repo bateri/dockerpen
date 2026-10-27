@@ -16,7 +16,8 @@ local is_up = model_containers.is_up
 local dialog = model_dialog.dialog
 local palette = model_palette.palette
 local DISK = model_disk.DISK
-local L, log_wipe = model_log.L, model_log.log_wipe
+local L, log_show_match, log_step_match, log_toggle_wrap, log_wipe =
+	model_log.L, model_log.log_show_match, model_log.log_step_match, model_log.log_toggle_wrap, model_log.log_wipe
 local ansi = require("../lib/ansi").ansi
 local fmt = require("../lib/fmt").fmt
 local toast = require("../model/toast").toast
@@ -243,12 +244,15 @@ function mouse.click(id, mods)
 		elseif rest == "time" then
 			L.timestamps = not L.timestamps
 		elseif rest == "wrap" then
-			L.wrap = not L.wrap
-			L.tops = nil
-			L.runs, L.run_count = {}, 0
+			log_toggle_wrap()
 		elseif rest == "only" then
+			-- The match on show stays on show, among the lines it found or in the whole log.
 			L.only = not L.only
-			lib_kit.scroll_to("log", 0)
+			if L.matches[L.match_at] then
+				log_show_match(L.match_at)
+			else
+				lib_kit.scroll_to("log", 0)
+			end
 		elseif rest == "clear" then
 			log_wipe()
 		elseif rest == "copy" then
@@ -260,9 +264,9 @@ function mouse.click(id, mods)
 			S.copy = table.concat(lines, "\n")
 			toast.say("Copied " .. fmt.count(#lines, "line"), { kind = "success" })
 		elseif rest == "next" then
-			log_keys("n", {})
+			log_step_match(1)
 		elseif rest == "prev" then
-			log_keys("N", {})
+			log_step_match(-1)
 		elseif rest == "more" then
 			log_keys("L", {})
 		end
