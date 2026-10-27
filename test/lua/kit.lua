@@ -165,6 +165,12 @@ function Kit:render(width, height, now)
 	return root, animating, wake
 end
 
+-- The host laid the page out: what depends on the layout is brought within it. Whether the page
+-- wants to be rendered again.
+function Kit:settle()
+	return pencere.settle()
+end
+
 function Kit:event(event)
 	event.mods = event.mods or {}
 	return pencere.handle(event)

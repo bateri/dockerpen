@@ -7,6 +7,15 @@ change what the previous one did.
 
 ## [Unreleased]
 
+### Fixed
+
+- The lists, the log and a container's Inspect keep up with a fast scroll, up as well as down: the
+  rows two screens ahead of the way they go are made already (at the end of the log, two screens
+  and a half above it), and they are made again only near the end of those, not at every turn of
+  the wheel.
+- Inspect scrolled past its first screen showed nothing below until something else on the page
+  changed: the lines that came into view were not made as it scrolled.
+
 ### Changed
 
 - dockerpen's page is held to pencere kit 2.0: the gate builds the `pencere` command from the
