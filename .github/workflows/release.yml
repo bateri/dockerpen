@@ -120,10 +120,11 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      # The Mac runner is built by this toolchain for its target; a Linux one is built in Docker.
+      # The Mac runner is built by this toolchain for its target; a Linux one is built in Docker, by
+      # the same Rust (pencere's rust:1.88-alpine).
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
         with:
-          toolchain: stable
+          toolchain: 1.88.0
           targets: ${{ runner.os == 'macOS' && matrix.target || '' }}
       - env:
           DIST_NATIVE: "1"
