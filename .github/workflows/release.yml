@@ -2,11 +2,12 @@
 # finished green on a push to main, and when it is started by hand:
 #
 # - plan: whether the version in src/program/version.lua has no tag yet (`make release-prepare`,
-#   committed and pushed). A commit that moved no version ends here. While tools/pencere-ref names
-#   a commit of pencere and not a release of it, plan refuses: there is no pencere to release with.
-# - build: the three files, made by the released `pencere` command of the release tools/pencere-ref
-#   names, which fetches the runner of each target from its own release and checks it there: no
-#   target's toolchain, one runner. They are summed, checked and attested (provenance).
+#   committed and pushed). A commit that moved no version ends here.
+# - target: each target on a machine of its own: its runner built from the pencere of
+#   tools/pencere-ref (`make runner`, pencere's own recipe), dockerpen packed into it by the command
+#   of that pencere (`make pack`), and the file played under the stand-in terminal there (`make
+#   test-binary`).
+# - files: the three files summed, checked (`make sums`) and attested (provenance).
 # - draft: the tag `v<version>` and the GitHub release as a draft, with the changelog section as its
 #   notes and the files.
 # - publish: waits in the `release` environment for a maintainer to approve it, refuses an
@@ -29,6 +30,10 @@ on:
         description: Only build and check; tag and publish nothing
         type: boolean
         default: false
+
+# What is released: the files are $NAME-<version>-<target>.
+env:
+  NAME: dockerpen
 
 # One release at a time, and none is cut short by the next.
 concurrency:
@@ -88,10 +93,54 @@ jobs:
           RELEASE_REQUIRE_CHECK: ${{ github.event_name == 'workflow_dispatch' }}
         run: node tools/release.mjs plan >> "$GITHUB_OUTPUT"
 
-  # The three files, from nothing: no cache, the released `pencere` command and runners.
-  build:
+  # Each target on a machine of its own system and architecture, from nothing (no cache, no
+  # emulation: DIST_NATIVE): its runner built from the pencere of tools/pencere-ref, dockerpen packed
+  # into it by the command of that pencere, and the file played in a pane of the stand-in terminal
+  # as the gate plays dist/dockerpen, on the machine it is for.
+  target:
     needs: plan
     if: needs.plan.outputs.release == 'true' || needs.plan.outputs.rehearse == 'true'
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-24.04-arm
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-24.04
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      # The Mac runner is built by this toolchain for its target; a Linux one is built in Docker.
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: stable
+          targets: ${{ runner.os == 'macOS' && matrix.target || '' }}
+      - env:
+          DIST_NATIVE: "1"
+        run: make runner TARGET=${{ matrix.target }}
+      - run: make pack TARGET=${{ matrix.target }}
+      - run: make test-binary DOCKERPEN_BIN="dist/release/$NAME-$(node tools/release.mjs version)-${{ matrix.target }}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: file-${{ matrix.target }}
+          path: dist/release/${{ env.NAME }}-*
+          if-no-files-found: error
+
+  # The three files together: their sums, the check of them (the files of this version, each the one
+  # the sums list, and the one this machine runs saying its version), and for a release the
+  # attestation of what was built here.
+  files:
+    needs: [plan, target]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -104,17 +153,19 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      - name: Install the pencere command
-        run: |
-          version="$(node tools/release.mjs pencere-version)"
-          PENCERE_VERSION="$version" PENCERE_INSTALL="$RUNNER_TEMP/pencere" \
-            sh -c "$(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/bateri/pencere/main/cli/install.sh)"
-      - run: make dist PENCERE="$RUNNER_TEMP/pencere/pencere"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: file-*
+          path: dist/release
+          merge-multiple: true
+      # An artifact keeps no file modes.
+      - run: chmod +x dist/release/$NAME-*
+      - run: make sums
       - if: needs.plan.outputs.rehearse != 'true'
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
-            dist/release/dockerpen-*
+            dist/release/${{ env.NAME }}-*
             dist/release/SHA256SUMS
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -125,8 +176,8 @@ jobs:
   # The tag, and the GitHub release as a draft. A job that is run again leaves a tag that is on
   # this commit and makes the draft again; a release that is public is not touched.
   draft:
-    needs: [plan, build]
-    if: needs.build.result == 'success' && needs.plan.outputs.release == 'true'
+    needs: [plan, files]
+    if: needs.files.result == 'success' && needs.plan.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write

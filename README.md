@@ -183,6 +183,9 @@ make dev PENCERE_SRC=../pencere
 make check PENCERE_SRC=../pencere
 ```
 
+`make pencere-pin` moves `tools/pencere-ref` to the head of pencere's `main` (`REF=` another
+branch, a tag or a commit), and `tools/pen.mk` is how all of this is done.
+
 What the tests are:
 
 - `test/program.test.mjs` runs the built program in a pane under the stand-in terminal, with a

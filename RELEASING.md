@@ -5,14 +5,20 @@ for macOS on Apple silicon and Linux on arm64 and x86_64, with a `SHA256SUMS`. T
 Mac file, because bateri runs on Apple silicon only. People install it with `install.sh` (see the
 README).
 
-Each file is pencere's Lua runner for one target with dockerpen packed into it. `make dist` makes
-all three with the released `pencere` command of the release `tools/pencere-ref` names
-(`cli-v<version>`), which fetches each target's runner from its own release. The gate tests
-against the same pencere, so to build with a newer one, change that file.
+Each file is pencere's Lua runner for one target with dockerpen packed into it, both from the
+pencere that `tools/pencere-ref` names, the one the gate tests against: to release with a newer
+pencere, move the pin (`make pencere-pin`, the head of pencere's `main`). How the files are made is
+`tools/pen.mk`:
 
-While pencere has no release of the kit dockerpen is written for, `tools/pencere-ref` names a commit
-of it. The gate is held to that commit, and there is no release: the workflow's plan, `make
-rehearse` and `make dist` refuse until the file names a release.
+- `make runner TARGET=<target>` builds the runner of a target with pencere's own recipe for it (its
+  `make runner`: a static Linux executable in pencere's Docker image, a Mac one on Apple silicon);
+- `make pack TARGET=<target>` packs dockerpen into it with the `pencere` command of the same commit;
+- `make sums` writes the `SHA256SUMS` and checks the files.
+
+The release workflow does each target on a machine of its own system and plays the file there under
+the stand-in terminal (`make test-binary DOCKERPEN_BIN=<the file>`), as the gate plays
+`dist/dockerpen`. On a Mac with Docker, `make runners` and `make dist` make all three here (the Linux
+runner of the other architecture emulated).
 
 ## Versions and the changelog
 
@@ -43,7 +49,6 @@ finished by running the workflow by hand on `main` (**Run workflow**, or
 
 ### What the checks refuse
 
-- a `tools/pencere-ref` that names a commit of pencere, not a release of it;
 - a version that is not after the last, or a `version.lua` that disagrees with the changelog;
 - a non-empty `## [Unreleased]`, or an empty release section;
 - a commit whose gate is not green, a tag on another commit, or a release that is public already;
