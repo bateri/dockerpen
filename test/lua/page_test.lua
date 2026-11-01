@@ -1387,3 +1387,32 @@ t.test("the keys ask the host to scroll the log: lines at once, a page over a mo
 	k:key("page_up")
 	t.eq(k.asks[#k.asks].animate, true, "a page, as the Mac's views go one")
 end)
+
+-- The place of the line of a menu the page asked for that says `title`.
+local function line_of(menu, title)
+	for index, entry in ipairs(menu.entries) do
+		if type(entry) == "table" and entry.title == title then
+			return index
+		end
+	end
+	error("the menu has no line " .. title)
+end
+
+t.test("a pick runs the line of the menu the person was shown, not of the last the page asked for", function()
+	local k = opened()
+	k:key("down")
+	local shown = k:key(".").menu
+	t.ok(shown and shown.serial, "the menu of the row the cursor is on, with the kit's number for it")
+	local copy = line_of(shown, "Copy the id")
+	-- The sort menu is asked for while that one is up: the host does not show it, and the person
+	-- picks from the first.
+	local asked = k:click("sort").menu
+	t.ok(asked and asked.serial ~= shown.serial, "another menu is asked for")
+	t.eq(k:event({ type = "menu", serial = shown.serial, index = copy }).copy, data.id("a"), "its own line is done")
+	t.eq(k:event({ type = "menu", serial = shown.serial, index = copy }), nil, "a menu is picked from once")
+	t.eq(k:event({ type = "menu", index = copy }), nil, "a pick of no menu the kit knows is not told the page")
+	-- The other is picked from by its own number, and the sort it chose is the one marked next.
+	k:event({ type = "menu", serial = asked.serial, index = line_of(asked, "   CPU") })
+	local again = k:click("sort").menu
+	line_of(again, "✓ CPU")
+end)

@@ -366,24 +366,27 @@ local function ask_clean(preset)
 	act.prune(preset)
 end
 
--- The menu of the row the cursor is on, at `at`.
+-- The menu of the row the cursor is on, at `at`. What a line does is in the line (`run`): the kit
+-- tells the pick with the table of the line of the menu the person was shown, which is not always
+-- the one asked for last (one is shown at a time).
 local function row_menu(at)
 	local section = S.section
-	local entries, acts = {}, {}
+	local entries = {}
 	if at.kind == "sort" then
 		for _, how in ipairs(SORTS) do
-			entries[#entries + 1] = { title = (S.sort == how and "✓ " or "   ") .. SORT_LABELS[how], enabled = true }
-			acts[#entries] = function()
-				S.sort = how
-				bump()
-			end
+			entries[#entries + 1] = {
+				title = (S.sort == how and "✓ " or "   ") .. SORT_LABELS[how],
+				enabled = true,
+				run = function()
+					S.sort = how
+					bump()
+				end,
+			}
 		end
-		S.menu = { acts = acts }
 		return { at = { x = at.x, y = at.y }, entries = entries }
 	end
 	local function item(title, key, enabled, fn)
-		entries[#entries + 1] = { title = title, key = key, enabled = enabled ~= false }
-		acts[#entries] = fn
+		entries[#entries + 1] = { title = title, key = key, enabled = enabled ~= false, run = fn }
 	end
 	local function line()
 		entries[#entries + 1] = "-"
@@ -439,7 +442,6 @@ local function row_menu(at)
 	else
 		return nil
 	end
-	S.menu = { acts = acts }
 	return { at = { x = at.x, y = at.y }, entries = entries }
 end
 

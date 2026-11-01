@@ -9,6 +9,10 @@ change what the previous one did.
 
 ### Fixed
 
+- A pick from a context menu or the sort menu runs the line the person was shown. The terminal
+  shows one menu at a time and not one asked for while another is up, and the page read a pick
+  against the last menu it had asked for, so a line of the menu on show could do what a line of
+  another menu does, or nothing. The page now acts on the line the terminal tells back.
 - The lists, the log and a container's Inspect keep up with a fast scroll, up as well as down: the
   rows two screens ahead of the way they go are made already (at the end of the log, two screens
   and a half above it), and they are made again only near the end of those, not at every turn of

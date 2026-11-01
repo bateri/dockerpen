@@ -88,7 +88,6 @@ local S = {
 	dialog = nil,
 	help = false,
 	palette = nil, -- the command palette, when it is up: { active = the entry the cursor is on }
-	menu = nil, -- what the entries of the menu that is up do
 	rev = 0,
 	cache = {},
 	pending_reload = nil,

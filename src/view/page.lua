@@ -419,10 +419,10 @@ local function handle(event)
 		S.typing = event.field ~= nil
 		result = true
 	elseif kind == "menu" then
-		local menu = S.menu
-		S.menu = nil
-		if menu and menu.acts[event.index] then
-			menu.acts[event.index]()
+		-- The line the person picked, in the table the page wrote for it.
+		local line = event.entry
+		if line and line.run then
+			line.run()
 		end
 		result = true
 	end
