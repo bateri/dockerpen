@@ -27,7 +27,7 @@ end
 local function state_of(c)
 	local busy = S.busy[c.id]
 	if busy then
-		return busy .. "…", "warning"
+		return busy, "warning"
 	end
 	if c.state == "running" then
 		if c.health == "unhealthy" then

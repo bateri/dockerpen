@@ -423,8 +423,8 @@ local function row_menu(at)
 			S.copy = c.id
 		end)
 		line()
-		item("Kill…", "K", up, act.kill_containers)
-		item("Remove…", "d", true, act.remove_containers)
+		item("Kill", "K", up, act.kill_containers)
+		item("Remove", "d", true, act.remove_containers)
 	elseif section == "images" or section == "volumes" or section == "networks" then
 		local row = cursor_row(section)
 		if row == nil then
@@ -436,7 +436,7 @@ local function row_menu(at)
 			end)
 			line()
 		end
-		item("Remove…", "d", not (row.item.builtin == true), function()
+		item("Remove", "d", not (row.item.builtin == true), function()
 			act.remove_listed(section)
 		end)
 	else

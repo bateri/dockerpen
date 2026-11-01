@@ -50,6 +50,11 @@ change what the previous one did.
   same pencere commit as its stand-in terminal and prelude, and the Lua test host offers the drag
   queries the 2.0 prelude asks for.
 
+- Labels, hints and messages no longer end in an ellipsis: the context menu says Kill and Remove,
+  the palette says Pull an image and Clean up and asks for a command, a container or an image, the
+  filter field asks for a name, an image or a port, and what the page says while it waits reads
+  "stopping" and "Reading the container". Only a line that was cut short to fit still ends in one.
+
 ## [0.4.0] - 2026-10-26
 
 ### Fixed

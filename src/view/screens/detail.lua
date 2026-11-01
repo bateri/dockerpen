@@ -339,7 +339,7 @@ local function overview(c, w)
 	if data == nil then
 		local slot = S.details[c.id]
 		body:child(
-			T(slot and slot.error or "Reading the container…", slot and slot.error and "error" or "quiet", SIZE.small)
+			T(slot and slot.error or "Reading the container", slot and slot.error and "error" or "quiet", SIZE.small)
 		)
 		return body
 	end
@@ -525,7 +525,7 @@ local function environment(c, w)
 	local data = detail_data()
 	local body = b.div():col():gap(10):px(14):pt(12):pb(18):no_shrink()
 	if data == nil then
-		return body:child(T("Reading the container…", "quiet", SIZE.small))
+		return body:child(T("Reading the container", "quiet", SIZE.small))
 	end
 	local query = (S.field == "env" and S.query) or ""
 	local secrets = 0
@@ -603,7 +603,7 @@ local function processes_tab(c, w)
 		return P.nothing("Could not list the processes", slot.error, "triangle-alert", w)
 	end
 	if slot.id ~= c.id or slot.titles == nil then
-		return pad:child(T("Looking at the processes…", "quiet", SIZE.small):px(6))
+		return pad:child(T("Looking at the processes", "quiet", SIZE.small):px(6))
 	end
 	local command = nil
 	local tracks = {}
@@ -681,7 +681,7 @@ end
 local function inspect_tab(c)
 	local data = detail_data()
 	if data == nil then
-		return b.div():px(14):pt(12):child(T("Reading the container…", "quiet", SIZE.small))
+		return b.div():px(14):pt(12):child(T("Reading the container", "quiet", SIZE.small))
 	end
 	local lines = data.lines
 	local box = b.div():col():grow(1):min_h(0)

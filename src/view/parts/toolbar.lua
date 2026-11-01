@@ -37,7 +37,7 @@ function toolbar.containers(width)
 		field_width, field_wide = 220, 300
 	end
 	local field =
-		P.field(S.field == "list", "Filter by name, image, port…", field_width, narrow and 90 or 120, field_wide)
+		P.field(S.field == "list", "Filter by name, image or port", field_width, narrow and 90 or 120, field_wide)
 	local options = {}
 	for _, f in ipairs(FILTERS) do
 		options[#options + 1] = {
@@ -86,7 +86,7 @@ function toolbar.plain(width, segments, extra, hint)
 	local bar = b.div():row():items_center():gap(6):h(SIZE.bar):pb(8):px(14):no_shrink()
 	local room = segments and #segments.options >= 6 and 700 or 470
 	if width >= room then
-		bar:child(P.field(S.field == "list", hint or "Filter by name, image, port…", width >= 600 and 220 or nil))
+		bar:child(P.field(S.field == "list", hint or "Filter by name, image or port", width >= 600 and 220 or nil))
 	end
 	if segments then
 		bar:child(P.segmented(segments.prefix, segments.options, segments.current))

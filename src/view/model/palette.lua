@@ -243,10 +243,10 @@ local function global_commands()
 			end,
 		})
 	end
-	add({ id = "pull", title = "Pull an image…", group = "Docker", icon = "download", run = ask_pull })
+	add({ id = "pull", title = "Pull an image", group = "Docker", icon = "download", run = ask_pull })
 	add({
 		id = "prune",
-		title = "Clean up…",
+		title = "Clean up",
 		group = "Docker",
 		icon = "sparkles",
 		detail = "remove what nothing uses",

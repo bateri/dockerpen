@@ -229,7 +229,7 @@ local function find_controls()
 	local more = L.scanned < L.count
 	local note
 	if total == 0 then
-		note = more and "…" or "No match"
+		note = more and "Looking" or "No match"
 	else
 		note = string.format("%d/%d", math.max(L.match_at, 1), total) .. (more and "+" or "")
 	end
@@ -308,7 +308,7 @@ local function log_tab(c, width)
 	local box = b.div():col():grow(1):min_h(0)
 	box:child(log_toolbar(width))
 	if L.id ~= c.id then
-		return box:child(P.nothing("Opening the log…", nil, nil, width))
+		return box:child(P.nothing("Opening the log", nil, nil, width))
 	end
 	if L.count == 0 then
 		local words = (L.ended and L.ended.message ~= "") and L.ended.message or "Nothing written yet"

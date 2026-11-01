@@ -108,7 +108,7 @@ end
 local function name_tag(c)
 	local busy = S.busy[c.id]
 	if busy then
-		return P.tag(busy .. "…", "accent")
+		return P.tag(busy, "accent")
 	end
 	local word, role = state_of(c)
 	if role == "error" or role == "warning" then
@@ -343,7 +343,7 @@ local function nothing_listed(width)
 	if S.failure and #S.containers == 0 then
 		local hint = S.failure.code == "docker-missing"
 				and "dockerpen runs the docker command. Install Docker, or put docker on the PATH."
-			or "Start Docker (or OrbStack, Colima, Podman…) and dockerpen carries on by itself."
+			or "Start Docker (or OrbStack, Colima or Podman) and dockerpen carries on by itself."
 		return P.nothing(
 			S.failure.code == "docker-missing" and "There is no docker command" or "Docker is not reachable",
 			hint,
@@ -353,7 +353,7 @@ local function nothing_listed(width)
 	end
 	if #S.containers == 0 then
 		if not S.known then
-			return P.nothing("Looking for containers…", nil, nil, width)
+			return P.nothing("Looking for containers", nil, nil, width)
 		end
 		return P.nothing(
 			"There are no containers",

@@ -81,7 +81,7 @@ local function table_screen(section, spec, width)
 		)
 	end
 	if S.lists[section] == nil and not S.problems[section] then
-		return col:child(P.nothing("Looking…", nil, nil, width))
+		return col:child(P.nothing("Looking", nil, nil, width))
 	end
 	if #rows == 0 then
 		if S.query ~= "" or (S.plain_filter[section] or "all") ~= "all" then
@@ -205,7 +205,7 @@ function screens.images(width)
 		title = "Images",
 		sub = function()
 			return S.lists.images and (fmt.count(#images, "image") .. " · " .. fmt.bytes(total_of(images, "size")))
-				or "reading…"
+				or "reading"
 		end,
 		verbs = {
 			parts_toolbar.verb("act:pull", "Pull", "download", width),
@@ -308,7 +308,7 @@ function screens.volumes(width)
 		title = "Volumes",
 		sub = function()
 			if S.lists.volumes == nil then
-				return "reading…"
+				return "reading"
 			end
 			local text = fmt.count(#volumes, "volume")
 			if sizes then
@@ -377,7 +377,7 @@ function screens.volumes(width)
 					#volume.containers == 0 and "quiet" or "accent"
 				)
 			else
-				cells[#cells + 1] = T(sizes and "–" or "counting…", "quiet", SIZE.small + 1)
+				cells[#cells + 1] = T(sizes and "–" or "counting", "quiet", SIZE.small + 1)
 			end
 			if w >= LIST_MEDIUM then
 				cells[#cells + 1] = #volume.containers > 0
@@ -395,7 +395,7 @@ function screens.networks(width)
 	return table_screen("networks", {
 		title = "Networks",
 		sub = function()
-			return S.lists.networks and fmt.count(#networks, "network") or "reading…"
+			return S.lists.networks and fmt.count(#networks, "network") or "reading"
 		end,
 		verbs = { parts_toolbar.verb("act:clean", "Clean up", "sparkles", width) },
 		lead = "network",

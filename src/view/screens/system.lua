@@ -40,7 +40,7 @@ function screens.system(width)
 	end
 	local usage = S.system and S.system.usage
 	if usage == nil then
-		body:child(T(S.problems.system and "" or "Counting the disk…", "dim", SIZE.body))
+		body:child(T(S.problems.system and "" or "Counting the disk", "dim", SIZE.body))
 	else
 		local total, freed = 0, 0
 		for _, kind in ipairs(DISK) do
