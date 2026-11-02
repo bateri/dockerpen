@@ -526,13 +526,13 @@ t.test("the wheel across reads a log to the right a character for its width, and
 		end
 		return ""
 	end
-	local reply = k:event({ type = "scroll", x = 900, y = 400, dx = 40, dy = 0 })
+	local reply = k:event({ type = "wheel", x = 900, y = 400, dx = 40, dy = 0 })
 	t.eq(reply.redraw, false, "the lines wrap: there is nothing to the right of them")
 	k:key("w")
 	k:render(1300, 760, 107)
 	t.eq(first_words(), "  GET /api/orders/20 200", "and they are read from their start once they do not")
 	-- Six characters of the log's size, and a little.
-	reply = k:event({ type = "scroll", x = 900, y = 400, dx = 6 * 12 * 0.62 + 1, dy = 0 })
+	reply = k:event({ type = "wheel", x = 900, y = 400, dx = 6 * 12 * 0.62 + 1, dy = 0 })
 	t.eq(reply.redraw, true)
 	k:render(1300, 760, 108)
 	t.eq(first_words(), "GET /api/orders/20 200", "six characters, across the two runs the line is in")

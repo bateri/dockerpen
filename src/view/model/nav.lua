@@ -386,7 +386,7 @@ local function row_menu(at)
 		return { at = { x = at.x, y = at.y }, entries = entries }
 	end
 	local function item(title, key, enabled, fn)
-		entries[#entries + 1] = { title = title, key = key, enabled = enabled ~= false, run = fn }
+		entries[#entries + 1] = { title = title, keys = key, enabled = enabled ~= false, run = fn }
 	end
 	local function line()
 		entries[#entries + 1] = "-"

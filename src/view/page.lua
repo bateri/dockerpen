@@ -362,7 +362,7 @@ local function handle(event)
 			mouse.click(clicked, S.press_mods)
 		end
 		result = true
-	elseif kind == "scroll" then
+	elseif kind == "wheel" then
 		-- What of the wheel no box the host scrolls took: across, a log's lines move under it (they
 		-- are not a box that scrolls across).
 		S.pointer = { x = event.x, y = event.y }
