@@ -4,17 +4,66 @@ Docker, in the terminal pane: containers, their logs and resource use, images, v
 networks and the disk they take, as a real interface — with the keyboard or the mouse, in
 the colours and font of your terminal, on your machine or on a server over plain `ssh`.
 
-![dockerpen: the containers of a compose project, with one container's resource use](docs/containers.png)
+<img src="docs/containers.png" width="720" alt="dockerpen: the containers of a compose project, with one container's resource use">
+
+## Install
+
+dockerpen is one file, with the interface inside it and nothing else to install but Docker. One
+line puts the newest release in `~/.local/bin`, after checking it against the release's
+`SHA256SUMS`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/bateri/dockerpen/main/install.sh | sh
+```
+
+To see the interface you need a terminal that hosts pencere views: [bateri](https://github.com/bateri/bateri), from its 0.23. In
+any other terminal dockerpen prints the containers as text.
+
+It is made for macOS on Apple silicon and for Linux on `arm64` and `x86_64`
+(`DOCKERPEN_VERSION=0.3.0` takes a version, `DOCKERPEN_INSTALL=<dir>` another directory). The files
+are on the [releases](https://github.com/bateri/dockerpen/releases) too, each with an attestation
+of the workflow that built it (`gh attestation verify <file> --repo bateri/dockerpen`); a file a
+browser downloads is quarantined by macOS, which `xattr -d com.apple.quarantine <file>` lifts.
+
+## Use
 
 dockerpen is a [pencere](https://github.com/bateri/pencere) program, written in Lua. Run it
 in a terminal that hosts pencere views ([bateri](https://github.com/bateri/bateri)) and the
 pane becomes the interface, the way `vim` takes the screen and gives it back; quit and the
 shell is where it was. Run it anywhere else and it prints the containers.
 
-The pictures here are drawn with the page kit's own engine, in the colours of one theme and
-a stand-in font; bateri draws the same page in your terminal's font and theme.
+```sh
+dockerpen                           # the interface
+dockerpen web                       # open with a container chosen (name, service or id)
+dockerpen --section images          # or on another part
+dockerpen --text                    # the containers as text, whatever the terminal is
+```
+
+**It runs the `docker` command, and nothing else.** dockerpen does not talk to the engine's
+socket: it starts `docker ps`, `docker stats`, `docker logs`, `docker events` and the rest,
+and reads what they print. So it reaches the engine the way `docker` does for you — the
+current Docker context, `DOCKER_HOST`, a rootless Docker, Docker Desktop, OrbStack, Colima,
+Rancher Desktop, or Podman's `docker` — with nothing to set up, and it needs only that
+`docker` is on the `PATH`. One `docker events` and one `docker stats` run while the screens
+that need them are shown, and none while they are not: an idle dockerpen starts nothing.
+
+**Over ssh.** Copy the file for the server's system to it and run it there, in a pane of a
+terminal that hosts pencere: nothing listens on a port, the interface travels in the
+terminal's own stream, and it runs on your machine in a sandbox that reaches nothing but its
+program. Its files cross the stream once; after that the terminal keeps them.
 
 ## What it does
+
+<table>
+  <tr>
+    <td width="33%" valign="top"><img src="docs/logs.png" width="100%" alt="Logs with the program's own colours"><br>Logs with the program's own colours</td>
+    <td width="33%" valign="top"><img src="docs/system.png" width="100%" alt="The disk Docker takes"><br>The disk Docker takes</td>
+    <td width="33%" valign="top"><img src="docs/narrow.png" width="100%" alt="An 80×24 pane: the sections are a strip"><br>An 80×24 pane: the sections are a strip</td>
+  </tr>
+</table>
+
+The pictures here are drawn with the page kit's own engine, in the colours of one theme and
+a stand-in font; bateri draws the same page in your terminal's font and theme.
 
 **Containers**, grouped by compose project, the ones that run first and the projects that do
 not run folded away. Each row has its state in a word and a colour (running, healthy,
@@ -52,10 +101,16 @@ clean-up that says what it will free before it frees it. **Activity**: what the 
 reported; a container that died, ran out of memory or turned unhealthy is also told as a
 toast wherever you are.
 
-|                                                             |                                           |
-| ----------------------------------------------------------- | ----------------------------------------- |
-| ![Logs with the program's own colours](docs/logs.png)       | ![The disk Docker takes](docs/system.png) |
-| ![An 80×24 pane: the sections are a strip](docs/narrow.png) |                                           |
+**What it does not do.**
+
+- It is not an MCP server any more: the Node program of dockerpen 0.2 was one, and `show_docker`
+  and the tools a model could call (`list_containers`, `container_logs`, `disk_usage`) are not in
+  this one. `dockerpen --text` prints the containers for whatever wants them as text.
+- It does not open a published port in the browser, and has no command palette: a page of the
+  kit can ask its terminal to pop up a menu, to copy and to give it a text field, and not to open
+  a link or to hold two fields.
+- Lines of a log are one line each, cut at the edge of the pane: `⇧→` reads them further to the
+  right.
 
 ## The keyboard, and the mouse
 
@@ -82,57 +137,6 @@ keys do where you are, and `?` lists them all.
 `⌃C` always reaches dockerpen, and the terminal's own shortcuts stay the terminal's. The
 terminal has one text field to give a page, so the filter, the search of a log and the name
 of an image to pull are all that field: what it says is what the list on show is filtered by.
-
-## Run it
-
-dockerpen is one file, with the interface inside it and nothing else to install but Docker. One
-line puts the newest release in `~/.local/bin`, after checking it against the release's
-`SHA256SUMS`:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/bateri/dockerpen/main/install.sh | sh
-```
-
-It is made for macOS on Apple silicon and for Linux on `arm64` and `x86_64`
-(`DOCKERPEN_VERSION=0.3.0` takes a version, `DOCKERPEN_INSTALL=<dir>` another directory). The files
-are on the [releases](https://github.com/bateri/dockerpen/releases) too, each with an attestation
-of the workflow that built it (`gh attestation verify <file> --repo bateri/dockerpen`); a file a
-browser downloads is quarantined by macOS, which `xattr -d com.apple.quarantine <file>` lifts.
-
-To see the interface you need a terminal that hosts pencere views. bateri is the first,
-from its 0.23. In any
-other terminal dockerpen prints the containers as text.
-
-```sh
-dockerpen                           # the interface
-dockerpen web                       # open with a container chosen (name, service or id)
-dockerpen --section images          # or on another part
-dockerpen --text                    # the containers as text, whatever the terminal is
-```
-
-**It runs the `docker` command, and nothing else.** dockerpen does not talk to the engine's
-socket: it starts `docker ps`, `docker stats`, `docker logs`, `docker events` and the rest,
-and reads what they print. So it reaches the engine the way `docker` does for you — the
-current Docker context, `DOCKER_HOST`, a rootless Docker, Docker Desktop, OrbStack, Colima,
-Rancher Desktop, or Podman's `docker` — with nothing to set up, and it needs only that
-`docker` is on the `PATH`. One `docker events` and one `docker stats` run while the screens
-that need them are shown, and none while they are not: an idle dockerpen starts nothing.
-
-**Over ssh.** Copy the file for the server's system to it and run it there, in a pane of a
-terminal that hosts pencere: nothing listens on a port, the interface travels in the
-terminal's own stream, and it runs on your machine in a sandbox that reaches nothing but its
-program. Its files cross the stream once; after that the terminal keeps them.
-
-**What it does not do.**
-
-- It is not an MCP server any more: the Node program of dockerpen 0.2 was one, and `show_docker`
-  and the tools a model could call (`list_containers`, `container_logs`, `disk_usage`) are not in
-  this one. `dockerpen --text` prints the containers for whatever wants them as text.
-- It does not open a published port in the browser, and has no command palette: a page of the
-  kit can ask its terminal to pop up a menu, to copy and to give it a text field, and not to open
-  a link or to hold two fields.
-- Lines of a log are one line each, cut at the edge of the pane: `⇧→` reads them further to the
-  right.
 
 ## How it works
 
