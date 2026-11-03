@@ -7,6 +7,8 @@ change what the previous one did.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-03
+
 ### Fixed
 
 - A pick from a context menu or the sort menu runs the line the person was shown. The terminal
