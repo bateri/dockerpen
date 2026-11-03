@@ -99,8 +99,8 @@ are on the [releases](https://github.com/bateri/dockerpen/releases) too, each wi
 of the workflow that built it (`gh attestation verify <file> --repo bateri/dockerpen`); a file a
 browser downloads is quarantined by macOS, which `xattr -d com.apple.quarantine <file>` lifts.
 
-To see the interface you need a terminal that hosts pencere views. bateri is the first, and
-no release of it has them yet: until one does, build bateri from its `main` branch. In any
+To see the interface you need a terminal that hosts pencere views. bateri is the first,
+from its 0.23. In any
 other terminal dockerpen prints the containers as text.
 
 ```sh
