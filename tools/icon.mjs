@@ -1,14 +1,17 @@
-// Draws dockerpen's icon, its mark (a prompt whose cursor is a shipping container: Docker, in the
-// terminal), as PNGs, and writes them to src/assets/icon-<side>-<theme>.png.
+// Draws dockerpen's icon, a white shipping container on a blue tile, as PNGs, and writes them to
+// src/assets/icon-<side>-<theme>.png.
 // A terminal draws a program's icon only from the bytes it is given, so the program carries them
 // (src/program/app.lua names the files); run this again after changing the shapes here.
 //
 //   node tools/icon.mjs
 //
-// It uses nothing but Node: the mark is a list of layers of simple shapes on a 32-unit grid (the
-// side of the smaller icon, so that an edge on a whole unit is a whole pixel at 32 and at 64), each
-// layer painted with an opacity or cut out of what is under it. A pixel's coverage is taken from a
-// grid of samples in it, and the PNG is written by hand around zlib.
+// It is made to be read at the 16 points a terminal's strip draws it at: few parts, nothing
+// thinner than 2 units, and the tile filling the square.
+//
+// It uses nothing but Node: the tile and the mark are each a list of layers of simple shapes on a
+// 32-unit grid (the side of the smaller icon, so that an edge on a whole unit is a whole pixel at 32
+// and at 64), each layer painted with an opacity or cut out of what is under it. A pixel's coverage
+// is taken from a grid of samples in it, and the PNG is written by hand around zlib.
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { deflateSync, crc32 } from "node:zlib";
@@ -17,27 +20,19 @@ import { fileURLToPath } from "node:url";
 /** The side of the grid the shapes are drawn on. */
 export const GRID = 32;
 
-/** The mark: the prompt's chevron, then the container where the cursor stands, its ribs cut out. */
+/** The tile the mark stands on, and its blue, from the top of it to the bottom. */
+const TILE = [{ paint: { rect: [1, 1, 30, 30, 7] } }];
+const TOP = [0x4f, 0x93, 0xf6];
+const BOTTOM = [0x1a, 0x52, 0xc4];
+
+/** The mark, in white on the tile: a container, its three ribs cut out. */
 export const MARK = [
-  {
-    paint: {
-      stroke: [
-        [4.5, 9.5],
-        [10.5, 16],
-        [4.5, 22.5],
-      ],
-      width: 3,
-    },
-  },
-  { paint: { rect: [14, 9, 16, 14, 2.5] } },
-  { cut: { any: [17, 20, 23, 26].map((x) => ({ rect: [x, 12, 1, 8] })) } },
+  { paint: { rect: [6, 9, 20, 14, 3] } },
+  { cut: { any: [10, 15, 20].map((x) => ({ rect: [x, 12, 2, 8] })) } },
 ];
 
-/** One colour for each ground, as an icon's `theme` says: the ground the icon is made to stand on. */
-const COLOURS = {
-  dark: [0x6c, 0xa8, 0xf5],
-  light: [0x1f, 0x5f, 0xc9],
-};
+/** The grounds an icon's `theme` names. The tile stands on either, so each gets the same picture. */
+const THEMES = ["dark", "light"];
 
 /** 32 pixels is what a terminal's strip asks for on a Retina screen; 64 for those that draw larger. */
 const SIDES = [32, 64];
@@ -148,11 +143,17 @@ export function coverage(mark, side, { samples = 8, scale = 1 } = {}) {
   return out;
 }
 
-/** The mark in one colour on nothing, as a PNG. */
-export function draw(mark, side, [red, green, blue]) {
-  const cover = coverage(mark, side);
+/** The mark in white on the tile, as a PNG. */
+export function draw(mark, side) {
+  const ground = coverage(TILE, side);
+  const ink = coverage(mark, side);
   const pixels = Buffer.alloc(side * side * 4);
-  cover.forEach((alpha, i) => pixels.set([red, green, blue, Math.round(alpha * 255)], i * 4));
+  for (let i = 0; i < side * side; i++) {
+    const down = Math.floor(i / side) / (side - 1);
+    const blue = TOP.map((c, k) => c + (BOTTOM[k] - c) * down);
+    const rgb = blue.map((c) => Math.round(255 * ink[i] + c * (1 - ink[i])));
+    pixels.set([...rgb, Math.round(ground[i] * 255)], i * 4);
+  }
   return png(side, pixels);
 }
 
@@ -188,9 +189,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const directory = new URL("../src/assets/", import.meta.url);
   mkdirSync(directory, { recursive: true });
   let written = 0;
-  for (const [theme, colour] of Object.entries(COLOURS)) {
+  for (const theme of THEMES) {
     for (const side of SIDES) {
-      writeFileSync(new URL(`icon-${side}-${theme}.png`, directory), draw(MARK, side, colour));
+      writeFileSync(new URL(`icon-${side}-${theme}.png`, directory), draw(MARK, side));
       written += 1;
     }
   }
