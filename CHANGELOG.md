@@ -7,6 +7,12 @@ change what the previous one did.
 
 ## [Unreleased]
 
+### Changed
+
+- dockerpen's icon is a terminal prompt whose cursor is a shipping container, in place of the
+  three stacked bars: Docker, in the terminal. It is drawn on a grid of the icon's own pixels, so
+  its edges and the container's ribs stay sharp at the 16 points a terminal's strip draws it at.
+
 ## [0.5.0] - 2026-11-03
 
 ### Fixed
