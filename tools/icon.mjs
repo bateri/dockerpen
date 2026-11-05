@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 export const GRID = 32;
 
 /** The tile the mark stands on, and its blue, from the top of it to the bottom. */
-const TILE = [{ paint: { rect: [1, 1, 30, 30, 7] } }];
+const TILE = [{ paint: { rect: [0, 0, 32, 32, 7] } }];
 const TOP = [0x4f, 0x93, 0xf6];
 const BOTTOM = [0x1a, 0x52, 0xc4];
 
