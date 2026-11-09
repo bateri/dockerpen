@@ -7,6 +7,10 @@ change what the previous one did.
 
 ## [Unreleased]
 
+### Changed
+
+- Building from source asks for Rust 1.99 (it was 1.88).
+
 ## [0.5.0] - 2026-11-03
 
 ### Fixed
