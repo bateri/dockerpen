@@ -1,11 +1,11 @@
 # dockerpen is one native file: pencere's Lua runner with the program (src/program/), the page
 # (src/view/page.lua) and the pictures (src/assets/) packed into it. The gate and the steps of a
 # release are here; RELEASING.md says in what order and why.
-.PHONY: check fmt lint build dev test test-page test-binary test-tools release-prepare rehearse
+.PHONY: check fmt lint build dev test test-page test-binary test-tools release-prepare release publish
 
 # What dockerpen ships: macOS on Apple silicon and Linux on both architectures (bateri, the terminal
 # that shows the view, runs on Apple silicon only). The pencere it is built, tested and released
-# with, and how its release is made, are tools/pen.mk.
+# with (pencere, fake-host, pencere-ref) and the files of its release (dist, sums) are tools/pen.mk.
 NAME = dockerpen
 TARGETS = aarch64-apple-darwin aarch64-unknown-linux-musl x86_64-unknown-linux-musl
 PACKAGE_VERSION = $(shell node tools/release.mjs version)
@@ -42,12 +42,13 @@ test-page: pencere
 # under the stand-in terminal, with a stand-in docker: the calls and topics of the page. Nothing in
 # it is skipped; a program or a stand-in that is not there stops the run.
 DOCKERPEN_BIN ?= dist/dockerpen
-test-binary: pencere
+test-binary: pencere fake-host
 	PENCERE_FAKE_HOST="$(FAKE_HOST)" DOCKERPEN_BIN="$(DOCKERPEN_BIN)" node --test test/program.test.mjs
 
-# test-tools runs the tests of the installer (install.sh) against a stand-in for GitHub.
+# test-tools runs the tests of the installer (install.sh), against a stand-in for GitHub, and of the
+# release checks (tools/release-files.mjs), against a directory of their own.
 test-tools:
-	node --test test/install.test.mjs
+	node --test test/install.test.mjs test/release.test.mjs
 
 test: test-page test-binary test-tools
 
@@ -60,8 +61,13 @@ release-prepare:
 	@test -n "$(VERSION)" || { echo "usage: make release-prepare VERSION=<x.y.z>"; exit 2; }
 	node tools/release.mjs prepare $(VERSION)
 
-# rehearse runs the checks of a release of the prepared version, on any branch. It changes nothing:
-# a release is the commit of release-prepare pushed to main, which the release workflow tags,
-# builds and drafts once the gate is green, and publishes when a maintainer approves (RELEASING.md).
-rehearse:
-	node tools/release.mjs rehearse
+# release runs the gate and the release checks (dist/release holds the three files of this
+# version, SHA256SUMS, app.json and its signature, made after the release commit), then tags.
+# Nothing is pushed.
+release: check
+	node tools/release.mjs tag
+
+# publish pushes main and the tag, then makes the GitHub release with the three files, SHA256SUMS,
+# app.json and app.json.sig. Publishing: run on the maintainer's word.
+publish:
+	node tools/release.mjs publish

@@ -45,5 +45,5 @@ jobs:
           {
             echo "### What this run was held to"
             echo
-            echo "pencere at \`$(cat tools/pencere-ref)\` (\`tools/pencere-ref\`): its \`pencere\` command, its \`pencere-fake-host\` and the prelude of its kit (\`kit/luau/prelude\`) that the page's tests run the page against."
+            echo "pencere at \`$(make -s pencere-ref)\` (\`tools/pencere-ref\`): its \`pencere\` command, its \`pencere-fake-host\` and the prelude of its kit (\`kit/luau/prelude\`) that the page's tests run the page against."
           } >> "$GITHUB_STEP_SUMMARY"

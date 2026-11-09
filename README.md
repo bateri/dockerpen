@@ -21,9 +21,9 @@ any other terminal dockerpen prints the containers as text.
 
 It is made for macOS on Apple silicon and for Linux on `arm64` and `x86_64`
 (`DOCKERPEN_VERSION=0.3.0` takes a version, `DOCKERPEN_INSTALL=<dir>` another directory). The files
-are on the [releases](https://github.com/bateri/dockerpen/releases) too, each with an attestation
-of the workflow that built it (`gh attestation verify <file> --repo bateri/dockerpen`); a file a
-browser downloads is quarantined by macOS, which `xattr -d com.apple.quarantine <file>` lifts.
+are on the [releases](https://github.com/bateri/dockerpen/releases) too, with the `SHA256SUMS` that
+names them and an `app.json` signed by the maintainer, which a terminal that follows dockerpen reads;
+a file a browser downloads is quarantined by macOS, which `xattr -d com.apple.quarantine <file>` lifts.
 
 ## Use
 

@@ -2,10 +2,11 @@
 # a pen's Makefile that is the same for every pen written in Lua. The Makefile sets NAME, TARGETS
 # (the targets it ships) and PACKAGE_VERSION (the version of the release), then includes it.
 #
-# pencere is the `pencere` command (the runner the program is packed into), its stand-in terminal
-# the end-to-end tests play the pen in (pencere-fake-host) and the prelude of its kit, the page API
-# the page's tests run the page against. All of it comes from one checkout of pencere, PENCERE_SRC,
-# and is built there by `make pencere`, which the steps that need it run first.
+# pencere is the `pencere` command (the runner the program is packed into, and `pencere dist`, which
+# signs a release), its stand-in terminal the end-to-end tests play the pen in (pencere-fake-host)
+# and the prelude of its kit, the page API the page's tests run the page against. All of it comes
+# from one checkout of pencere, PENCERE_SRC, and is built there by `make pencere` and `make
+# fake-host`, which the steps that need them run first.
 #
 # By default it is pencere at the commit in tools/pencere-ref, fetched into .cache/pencere: the pen
 # is built, tested and released with that pencere and nothing else, on any machine. To work against
@@ -16,7 +17,7 @@
 #
 # `make pencere-pin` moves the pin to the head of pencere's main (REF=<branch, tag or commit> to
 # another).
-.PHONY: pencere-src pencere pencere-pin runner runners pack sums dist
+.PHONY: pencere-src pencere fake-host pencere-ref pencere-pin runner runners pack dist sums
 
 PENCERE_GIT = https://github.com/bateri/pencere
 PENCERE_REF := $(shell cat tools/pencere-ref)
@@ -50,11 +51,19 @@ pencere-src:
 			echo "pencere: $(PENCERE_SRC) is at $${head:-no commit}, not at $(PENCERE_REF) (tools/pencere-ref)"; \
 	fi
 
-# pencere builds the command and the stand-in terminal in PENCERE_SRC, so that they are what its
-# prelude is.
+# pencere builds the `pencere` command in PENCERE_SRC, so that it is what its prelude is.
 pencere: pencere-src
 	@command -v cargo >/dev/null || { echo "pencere: cargo is not installed: pencere is built from its source (https://rustup.rs)"; exit 1; }
-	cd "$(PENCERE_SRC)" && cargo build --release -p pencere-cli -p pencere-fake-host
+	cd "$(PENCERE_SRC)" && cargo build --release -p pencere-cli
+
+# fake-host builds the stand-in terminal in PENCERE_SRC.
+fake-host: pencere-src
+	@command -v cargo >/dev/null || { echo "pencere: cargo is not installed: pencere is built from its source (https://rustup.rs)"; exit 1; }
+	cd "$(PENCERE_SRC)" && cargo build --release -p pencere-fake-host
+
+# pencere-ref says which pencere tools/pencere-ref takes.
+pencere-ref:
+	@echo "$(PENCERE_REF)"
 
 # pencere-pin writes into tools/pencere-ref the commit that REF (a branch, a tag or a whole commit
 # of pencere; main if none) is at, whole: the pin is always a commit, which a branch is not.
@@ -92,16 +101,40 @@ pack: pencere
 	mkdir -p dist/release
 	"$(PENCERE)" build --name $(NAME) --target $(TARGET) --runner "$(RUNNERS)/pencere-$(TARGET)" -o $(call RELEASE_FILE,$(TARGET))
 
-# sums writes the SHA256SUMS of the files of a release in dist/release and checks the release: the
-# files of every one of TARGETS, each the file the sums list (tools/release.mjs dist).
+# dist makes the file of a release for one target (TARGET, one of TARGETS) into dist/release, as
+# dockerpen-<version>-<target>: pencere's runner for the target, built here from PENCERE_SRC (when
+# RUNNERS has none of that commit yet: a Mac one on Apple silicon, a Linux one in pencere's Docker
+# image, the one of the architecture this machine is not emulated), with dockerpen packed into it.
+# `make sums` then names the files where they are together and signs the app.json that says what
+# they are. Without TARGET it makes the three, into a dist/release made new.
+ifeq ($(TARGET),)
+dist:
+	rm -rf dist/release
+	@for target in $(TARGETS); do $(MAKE) --no-print-directory dist TARGET=$$target || exit 1; done
+else
+dist: pencere-src
+	@case " $(TARGETS) " in *" $(TARGET) "*) ;; *) echo "dist: $(TARGET) is not one of: $(TARGETS)"; exit 2;; esac
+	@commit=$$(git -C "$(PENCERE_SRC)" rev-parse HEAD); \
+	if [ -s "$(RUNNERS)/pencere-$(TARGET)" ] && [ "$$(cat "$(RUNNERS)/pencere-$(TARGET).commit" 2>/dev/null)" = "$$commit" ]; then \
+		echo "dist: the runner for $(TARGET) in $(RUNNERS) is of pencere $$commit"; \
+	else \
+		$(MAKE) --no-print-directory runner TARGET=$(TARGET) || exit 1; \
+	fi
+	@$(MAKE) --no-print-directory pack TARGET=$(TARGET)
+endif
+
+# sums writes the SHA256SUMS of the files of dist/release, then the app.json that names them and its
+# signature (`pencere dist`, which signs with the key `pencere key` made: ~/.config/pencere/
+# signing.key, or the one PENCERE_SIGNING_KEY names). A terminal that follows dockerpen reads those
+# two. What the program needs of its terminal in app.json comes from the program itself, the file
+# of this machine's target, started once. DIST_FLAGS goes to `pencere dist`: --base, --previous.
+#
+# On release day PENCERE must be a pencere that has `dist` and is the one tools/pencere-ref names
+# (PENCERE_REF): `make pencere` builds it. A release made with another one has an app.json that
+# the pencere dockerpen is built with did not write.
+DIST_FLAGS ?=
 sums:
 	cd dist/release && { sha256sum $(NAME)-* 2>/dev/null || shasum -a 256 $(NAME)-*; } > SHA256SUMS
 	@cat dist/release/SHA256SUMS
-	node tools/release.mjs dist dist/release
-
-# dist makes the files of a release here, from the runners in RUNNERS (make runners): each target
-# packed, then the sums. The release workflow does the same, a target on a machine of its own.
-dist:
-	rm -rf dist/release
-	@for target in $(TARGETS); do $(MAKE) --no-print-directory pack TARGET=$$target || exit 1; done
-	@$(MAKE) --no-print-directory sums
+	@test -x "$(PENCERE)" || { echo "sums: no pencere at $(PENCERE): make pencere, or PENCERE=<a pencere command that has dist>"; exit 1; }
+	"$(PENCERE)" dist --files dist/release --name $(NAME) $(DIST_FLAGS) $(PACKAGE_VERSION)
