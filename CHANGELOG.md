@@ -7,6 +7,12 @@ change what the previous one did.
 
 ## [Unreleased]
 
+### Changed
+
+- dockerpen's icon is a sailing boat, in place of the three stacked bars: its mast and its full
+  sail are a D, and the foot of the sail follows the curve of the hull under it. The bars went
+  faint at a tab's size and stood too near the bars of other programs.
+
 ## [0.6.0] - 2026-11-09
 
 ### Added
