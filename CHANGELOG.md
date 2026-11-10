@@ -7,6 +7,8 @@ change what the previous one did.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-10
+
 ### Changed
 
 - dockerpen's icon is a sailing boat, in place of the three stacked bars: its mast and its full
