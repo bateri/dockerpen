@@ -7,6 +7,13 @@ change what the previous one did.
 
 ## [Unreleased]
 
+### Fixed
+
+- A screen reader, and an agent that reads the pane, hear the rail's six icons by name and which
+  section is open, which filter is on (Running, Issues) and whether grouping by project and the other
+  buttons that stay down are on. They were told by colour and fill alone, so the icons were nameless and
+  the filter was not there to be read.
+
 ## [0.6.1] - 2026-11-10
 
 ### Changed

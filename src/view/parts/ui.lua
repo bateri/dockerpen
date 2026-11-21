@@ -142,8 +142,8 @@ end
 
 -- A button: a verb. `o`: `variant` ("default", "ghost", "primary", "danger", "danger-ghost"), `size`
 -- ("sm" is a little smaller), `icon` (the name of one, before the label; with no label the button is a
--- square of it), `selected` (pressed in), `disabled`, `ink` (the role of its icon and label, in
--- place of the variant's).
+-- square of it), `selected` (true or false: a button that stays down, pressed in when true), `disabled`,
+-- `ink` (the role of its icon and label, in place of the variant's).
 function P.button(id, label, o)
 	o = o or {}
 	local variant = o.variant or (o.primary and "primary") or (o.danger and "danger-ghost") or "default"
@@ -164,6 +164,10 @@ function P.button(id, label, o)
 		end
 	else
 		el:px(o.px or (small and 8 or 10))
+	end
+	-- A button that stays down says to a screen reader whether it is: its fill says it to the eye.
+	if o.selected ~= nil then
+		el:role("switch"):checked(o.selected)
 	end
 	local ink = "foreground"
 	if o.disabled then
@@ -533,7 +537,9 @@ function P.segmented(prefix, options, current, seg_px)
 	for _, option in ipairs(options) do
 		local id = prefix .. option.id
 		local active = option.id == current
+		-- A tab of the control to a screen reader, the one that is on chosen (its fill says it to the eye).
 		local seg = b.div():row():items_center():gap(6):h(24):px(seg_px or 9):rounded(6):press(id):no_shrink()
+		seg:role("tab"):selected(active)
 		local level = glow(id, hovered(id) and not active)
 		if active then
 			seg:bg("raised2"):border(1, alpha("border", 0.8))

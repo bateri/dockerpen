@@ -51,7 +51,7 @@ function toolbar.containers(width)
 	local group = P.button(
 		"group",
 		nil,
-		{ variant = "ghost", size = "sm", icon = "folder-tree", icon_size = 14, selected = S.group }
+		{ variant = "ghost", size = "sm", icon = "folder-tree", icon_size = 14, selected = S.group == true }
 	)
 	local sort = P.button("sort", not narrow and SORT_LABELS[S.sort] or nil, {
 		variant = "ghost",

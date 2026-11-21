@@ -117,7 +117,12 @@ local function item(section, compact)
 	local el = b.div():press(id):row():items_center():gap(10):h(ITEM):rounded(6):no_shrink()
 	-- Its name and its key while the pointer rests on it, as the web page's tip said them.
 	el:tip(section.label, section.key)
+	-- To a screen reader it is a tab of the rail, the open one chosen: the pill and the ink say so only
+	-- to the eye.
+	el:role("tab"):selected(active)
 	if compact then
+		-- Its icon alone has no words to be read by; expanded, the label and the count beside it are.
+		el:label(section.label)
 		el:justify_center()
 	else
 		el:px(8)

@@ -89,6 +89,53 @@ t.test("the filters count what they show", function()
 	t.lacks(texts, "web")
 end)
 
+-- What a screen reader is told of an element: the kit's meta for it (what the host's `accessible` reads).
+local function meta_of(k, id)
+	local element = kit.find(k.root, id)
+	t.ok(element, id .. " is on the page")
+	return element.meta
+end
+
+t.test("the filter that is on is the one chosen to a screen reader, and not by its fill alone", function()
+	local k = opened()
+	t.eq(meta_of(k, "filter:all").selected, true, "All is on at the start")
+	t.eq(meta_of(k, "filter:all").role, "tab")
+	t.ok(not meta_of(k, "filter:running").selected, "Running is not")
+	k:key("f")
+	k:render(1300, 760, 102)
+	t.eq(meta_of(k, "filter:running").selected, true, "Running is on after f")
+	t.ok(not meta_of(k, "filter:all").selected, "and All is not")
+end)
+
+t.test("the rail names its sections and says which is open, expanded and as icons alone", function()
+	for _, narrow in ipairs({ false, true }) do
+		local k = opened({ width = narrow and 700 or 1300 })
+		local how = narrow and "icons alone" or "expanded"
+		for _, section in ipairs({ "containers", "images", "volumes", "networks", "activity", "system" }) do
+			local meta = meta_of(k, "sec:" .. section)
+			t.eq(meta.role, "tab", section .. " is a tab, " .. how)
+			t.eq(meta.selected, section == "containers", section .. ": the open one is chosen, " .. how)
+		end
+		if narrow then
+			t.eq(meta_of(k, "sec:images").label, "Images", "an icon alone has its name")
+			t.eq(meta_of(k, "sec:system").label, "System")
+		end
+		k:key("2")
+		k:render(narrow and 700 or 1300, 760, 102)
+		t.eq(meta_of(k, "sec:images").selected, true, "the section that was opened is chosen, " .. how)
+		t.ok(not meta_of(k, "sec:containers").selected, "and the one left is not, " .. how)
+	end
+end)
+
+t.test("a button that stays down says whether it is, to a screen reader", function()
+	local k = opened()
+	t.eq(meta_of(k, "group").checked, true, "grouping by project starts on")
+	t.eq(meta_of(k, "group").role, "switch")
+	k:click("group")
+	k:render(1300, 760, 102)
+	t.eq(meta_of(k, "group").checked, false, "and is off once it is pressed")
+end)
+
 t.test("a stopped project is opened by its row", function()
 	local k = opened()
 	t.lacks(page_texts(k), "site")
