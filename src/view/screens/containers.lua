@@ -52,6 +52,9 @@ local function row_grid(l, height)
 	return b.div():grid(l.tracks):gap_x(10):items_center():h(height)
 end
 
+-- The words of a head that are acronyms: not read as a capital and small letters ("Cpu").
+local ACRONYMS = { CPU = "CPU" }
+
 -- One column of the head of the list: the word, and a way to sort by it.
 local function head_cell(label, how, align)
 	local cell = b.div():row():items_center():gap(3):min_w(0)
@@ -61,8 +64,10 @@ local function head_cell(label, how, align)
 	local active = how ~= nil and S.sort == how
 	local level = how ~= nil and hover_glow("sorth:" .. how) or 0
 	if how then
-		-- The word is drawn in capitals; it is read as a word, which is not the sort button's ("Sort by Name").
-		cell:press("sorth:" .. how):label(string.sub(label, 1, 1) .. string.lower(string.sub(label, 2)))
+		-- The word is drawn in capitals; it is read as a word, which is not the sort button's ("Sort by Name"), and an
+		-- acronym is read as it is written.
+		local said = ACRONYMS[label] or (string.sub(label, 1, 1) .. string.lower(string.sub(label, 2)))
+		cell:press("sorth:" .. how):label(said)
 	end
 	cell:child(T(label, active and "dim" or blend("quiet", "dim", level), SIZE.tiny + 0.5):truncate())
 	if active then
