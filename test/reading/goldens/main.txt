@@ -1,0 +1,52 @@
+focus: page
+items:
+jtp9v0  tab "Containers 2" [selected, description "Containers", keys "1"]
+yyvva8  tab "Images 3" [description "Images", keys "2"]
+ngk1yy  tab "Volumes 1" [description "Volumes", keys "3"]
+0n72cg  tab "Networks 2" [description "Networks", keys "4"]
+1sp13a  tab "System" [keys "5"]
+0w3ga5  tab "Activity" [keys "6"]
+        text "Stand-in OS"
+        text "cpu"
+        text "12%"
+        text "mem"
+        text "48.2MiB"
+        text "5 running · 6 cpu · 11.7GiB"
+        text "Containers"
+        text "5 running · 7 total"
+n3wsbc  button "Pull"
+mp298w  button "Clean up"
+k7fq30  button "/"
+q5ybvd  tab "All 7" [selected]
+jyz0bq  tab "Running 5"
+5pr01m  tab "Stopped 2"
+e1zbnw  tab "Issues 2"
+3by80p  switch "Group by compose project" [checked, keys "P"]
+2e955e  button "Sort by Name"
+1phfp1  button "Name"
+        text "IMAGE"
+zgacz2  button "Cpu"
+4553k7  button "Memory"
+        text "PORTS"
+qs8tye  button "Status"
+2yy912  button "shop 4/5 up · 2 with issues"
+hkfy56  button "Stop"
+cbbr62  button "Restart" [keys "r"]
+zvv3yn  button "api node:22-alpine 12.5% 48.2MiB :3000 up 3m" [action "Stop", action "Restart", action "Logs"]
+wegxv9  button "db starting postgres:17-alpine – – up 3m" [action "Stop", action "Restart", action "Logs"]
+3yddcj  button "mailer exited 1 busybox – – 2m ago" [action "Start", action "Restart", action "Logs"]
+0gjazm  button "search unhealthy busybox – – up 3m" [action "Stop", action "Restart", action "Logs"]
+tvnp3w  button "web nginx:alpine – – up 3m" [action "Stop", action "Restart", action "Logs"]
+yk5zmt  button "blog 0/1 up"
+49rp10  button "Standalone 1/1 up"
+kq434x  button "toolbox redis:alpine – – up 1h" [action "Stop", action "Restart", action "Logs"]
+xnar76  button "s stop"
+438q97  button "r restart"
+        text "."
+        text "more"
+        text "space"
+        text "mark"
+vkezc4  button ": commands"
+j6g64y  button "?"
+fields:
+px62tc  field "Filter by name, image or port"

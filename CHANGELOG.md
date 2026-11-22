@@ -13,6 +13,12 @@ change what the previous one did.
   section is open, which filter is on (Running, Issues) and whether grouping by project and the other
   buttons that stay down are on. They were told by colour and fill alone, so the icons were nameless and
   the filter was not there to be read.
+  The command palette, the dialogs and the sheet of keys are read as dialogs, with the page behind them
+  left out of what is read, and the dimmed part around them is not read (it was an unnamed button); the
+  palette lists "Close". A container's row lists its Stop or Start, Restart and Logs for a screen reader or
+  an agent to do on it. The sort button and the column heads no longer share a name, the boxes that mark a
+  row, the buttons that open an image's layers and the line that resizes the detail have one. A pencere
+  too old for this shows a screen that says to update bateri, instead of a page that does not run.
 
 ## [0.6.1] - 2026-11-10
 

@@ -1,7 +1,7 @@
 # dockerpen is one native file: pencere's Lua runner with the program (src/program/), the page
 # (src/view/page.lua) and the pictures (src/assets/) packed into it. The gate and the steps of a
 # release are here; RELEASING.md says in what order and why.
-.PHONY: check fmt lint build dev test test-page test-binary test-tools release-prepare release publish
+.PHONY: check fmt lint build dev test test-page test-reading test-binary test-tools release-prepare release publish
 
 # What dockerpen ships: macOS on Apple silicon and Linux on both architectures (bateri, the terminal
 # that shows the view, runs on Apple silicon only). The pencere it is built, tested and released
@@ -38,6 +38,16 @@ dev: pencere
 test-page: pencere
 	PENCERE="$(PENCERE)" PENCERE_PRELUDE="$(PRELUDE)" node --test test/lua.test.mjs
 
+# test-reading sets what an agent reads of the page, in a few states, against the goldens of
+# test/reading/goldens, and holds each reading to the reading audit (a control with no name, an item said
+# twice, a modal's page read behind it): the page is opened in pencere's runner of tests, built in
+# PENCERE_SRC. PENCERE_BLESS=1 writes the goldens.
+PENCERE_TEST ?= $(PENCERE_SRC)/target/release/pencere-test
+pencere-test: pencere-src
+	cd "$(PENCERE_SRC)" && cargo build --release -p pencere-test
+test-reading: pencere-test
+	READING_GOLDENS="$(CURDIR)/test/reading/goldens" "$(PENCERE_TEST)" test/reading/reading_test.lua --root . --jobs 1
+
 # test-binary runs the program, dist/dockerpen (DOCKERPEN_BIN, a file of a release too), in a pane
 # under the stand-in terminal, with a stand-in docker: the calls and topics of the page. Nothing in
 # it is skipped; a program or a stand-in that is not there stops the run.
@@ -50,7 +60,7 @@ test-binary: pencere fake-host
 test-tools:
 	node --test test/install.test.mjs test/release.test.mjs
 
-test: test-page test-binary test-tools
+test: test-page test-reading test-binary test-tools
 
 # check is the gate: formatting, the program built, the page's tests and the built program held
 # to what the page expects of it.

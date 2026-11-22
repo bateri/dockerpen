@@ -25,7 +25,8 @@ function table_part.head(tracks, columns, sorted)
 		local id = column.sort and ("sorth:" .. column.sort) or nil
 		local active = column.sort ~= nil and sorted == column.sort
 		if id then
-			cell:press(id)
+			-- The word is drawn in capitals; it is read as a word, which is not the sort button's.
+			cell:press(id):label(column.label)
 		end
 		cell:child(
 			T(
@@ -61,10 +62,16 @@ end
 function table_part.lead(row_id, marked_on, mark, name)
 	local cell = b.div():row():items_center():justify_center()
 	if S.any_marked then
-		return cell:press("mark:" .. row_id):child(P.check(marked_on))
+		return cell:press("mark:" .. row_id)
+			:role("checkbox")
+			:checked(marked_on == true)
+			:label("Mark")
+			:child(P.check(marked_on))
 	end
 	if name == "chevron-right" or name == "chevron-down" then
 		return cell:press("layers:toggle:" .. row_id)
+			:label(name == "chevron-down" and "Hide layers" or "Show layers")
+			:expanded(name == "chevron-down")
 			:child(P.icon(name, 13, blend("quiet", "foreground", hover_glow("layers:toggle:" .. row_id))))
 	end
 	return cell:child(P.icon(name, 13, "quiet"))

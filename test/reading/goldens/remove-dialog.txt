@@ -1,0 +1,8 @@
+focus: page
+note: behind the modal in front, 51 items of the page, not read
+items:
+fg3e22  dialog "Remove shop-api-1?"
+          text "The container and its writable layer go; the image node:22-alpine stays. It is running and will be stopped first."
+q4wkd7    button "Also remove anonymous volumes Named volumes are kept either way"
+fdyfb7    button "Cancel esc"
+enh19z    button "Remove ⏎"

@@ -61,7 +61,8 @@ local function head_cell(label, how, align)
 	local active = how ~= nil and S.sort == how
 	local level = how ~= nil and hover_glow("sorth:" .. how) or 0
 	if how then
-		cell:press("sorth:" .. how)
+		-- The word is drawn in capitals; it is read as a word, which is not the sort button's ("Sort by Name").
+		cell:press("sorth:" .. how):label(string.sub(label, 1, 1) .. string.lower(string.sub(label, 2)))
 	end
 	cell:child(T(label, active and "dim" or blend("quiet", "dim", level), SIZE.tiny + 0.5):truncate())
 	if active then
@@ -241,9 +242,26 @@ local function container_row(row, l, peak)
 		glow(id, over),
 		marked_on
 	)
+	-- What a screen reader or an agent can do on the row, which the icons at its end stand for to the
+	-- pointer: the kit lists them on the row, and the page is told which one and on which row.
+	local busy = S.busy[c.id] ~= nil
+	local toggle = (c.state == "running" or c.state == "restarting") and "Stop"
+		or (c.state == "paused" and "Unpause" or "Start")
+	el:command("toggle", toggle, nil, not busy)
+	el:command("restart", "Restart", nil, not busy)
+	el:command("logs", "Logs")
 	-- The dot, or, where something is marked, a box to mark with.
 	if S.any_marked then
-		el:child(b.div():press("mark:" .. c.id):row():justify_center():child(P.check(marked_on)))
+		el:child(
+			b.div()
+				:press("mark:" .. c.id)
+				:role("checkbox")
+				:checked(marked_on == true)
+				:label("Mark " .. display_name(c, false))
+				:row()
+				:justify_center()
+				:child(P.check(marked_on))
+		)
 	else
 		el:child(b.div():row():justify_center():child(P.dot(c)))
 	end

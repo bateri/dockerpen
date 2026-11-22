@@ -16,10 +16,19 @@ local P, T, blend, glow, hover_glow, hovered =
 
 local overlays = {}
 
--- A scrim over everything with a card in it; a press on the scrim (not on the card) is `id`.
-local function over(card, id, top)
-	card:press("overlay:card")
-	local scrim = b.div():absolute():inset(0, 0, 0, 0):col():items_center():bg(alpha("background", 0.62)):press(id)
+-- A scrim over everything with a card in it; a press on the scrim (not on the card) is `id`. The card is
+-- the dialog (`name` is what it is called), the scrim is the layer it stands in, and no one reads it.
+local function over(card, id, top, name)
+	card:press("overlay:card"):role("dialog"):label(name)
+	local scrim = b.div()
+		:absolute()
+		:inset(0, 0, 0, 0)
+		:col()
+		:items_center()
+		:bg(alpha("background", 0.62))
+		:press(id)
+		:role("none")
+		:layer(true)
 	if top then
 		scrim:pt(top)
 	else
@@ -161,7 +170,7 @@ function overlays.dialog()
 		disabled = not dialog.ready(),
 	}))
 	card:child(actions)
-	return over(card, "dialog:backdrop")
+	return over(card, "dialog:backdrop", nil, d.title)
 end
 
 -- The keys, a section at a time, as the original lists them (what this page cannot do is not here).
@@ -271,7 +280,7 @@ function overlays.help()
 		end
 	end
 	card:child(b.div():col():id("help.scroll"):h(math.max(math.min(S.height - 200, 480), 120)):scroll():child(grid))
-	return over(card, "help:backdrop", math.min(math.floor(S.height * 0.12), 80))
+	return over(card, "help:backdrop", math.min(math.floor(S.height * 0.12), 80), "Keyboard shortcuts")
 end
 
 -- What was said for a moment, at the end of the page.
@@ -335,6 +344,7 @@ function overlays.jobs()
 	if not S.jobs_open or #S.jobs == 0 then
 		return nil
 	end
+	-- What is running is read in the page, which stays (this is no modal layer).
 	local card = b.div()
 		:col()
 		:p(6)
@@ -346,6 +356,8 @@ function overlays.jobs()
 		:inset(nil, 8, SIZE.status + 6, nil)
 		:w(math.min(340, S.width - 24))
 		:press("overlay:card")
+		:role("group")
+		:label("Background jobs")
 	local index = 0
 	for position = #S.jobs, 1, -1 do
 		local job = S.jobs[position]
@@ -373,7 +385,7 @@ function overlays.jobs()
 		end
 		card:child(el)
 	end
-	return b.div():absolute():inset(0, 0, 0, 0):press("jobs:backdrop"):child(card)
+	return b.div():absolute():inset(0, 0, 0, 0):press("jobs:backdrop"):role("none"):layer(false):child(card)
 end
 
 return {

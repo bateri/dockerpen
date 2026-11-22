@@ -1,0 +1,27 @@
+focus: field px62tc
+note: behind the modal in front, 46 items of the page, not read
+items:
+nsc002  dialog "Command palette" [action "Close"]
+          text "esc"
+          text "CONTAINER"
+5deh1v    button "Stop 5 containers s"
+rd5g01    button "Start 5 containers s"
+6wtaye    button "Restart 5 containers r"
+y0hthf    button "Pause 5 containers p"
+sa2ckb    button "Kill 5 containers K"
+6x49xh    button "Remove 5 containers d"
+          text "GO TO"
+kbc7hw    button "Go to Containers 1"
+9865ep    button "Go to Images 2"
+zv667d    button "Go to Volumes 3"
+          text "↑"
+          text "↓"
+          text "choose"
+          text "⏎"
+          text "to the list"
+          text "esc"
+          text "to the list"
+fields:
+px62tc  field "Type a command, a container or an image"
+scrolls:
+bj3det  scroll 0% (at the top)

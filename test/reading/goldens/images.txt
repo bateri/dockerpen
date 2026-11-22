@@ -1,0 +1,59 @@
+focus: page
+items:
+jtp9v0  tab "Containers 2" [description "Containers", keys "1"]
+yyvva8  tab "Images 3" [selected, description "Images", keys "2"]
+ngk1yy  tab "Volumes 1" [description "Volumes", keys "3"]
+0n72cg  tab "Networks 2" [description "Networks", keys "4"]
+1sp13a  tab "System" [keys "5"]
+0w3ga5  tab "Activity" [keys "6"]
+        text "Stand-in OS"
+        text "cpu"
+        text "12%"
+        text "mem"
+        text "48.2MiB"
+        text "5 running · 6 cpu · 11.7GiB"
+        text "Images"
+        text "3 images · 1.3 GB"
+n3wsbc  button "Pull"
+mp298w  button "Clean up"
+k7fq30  button "/"
+e6nv74  tab "All 3" [selected]
+7rt6nb  tab "In use 1"
+adfafc  tab "Unused 2"
+z6npgq  tab "Dangling 1"
+zqyym6  button "Remove 1"
+1phfp1  button "Name"
+        text "ID"
+xbfqsj  button "Size"
+w71ws5  button "Age"
+        text "USED BY"
+5psppm  button "node:22-alpine +1 999999999999 180 MB 10d 1 shop-api-1"
+spgt4p  checkbox "Mark" [checked]
+        text "node:22-alpine"
+        text "node:lts"
+        text "used by"
+00x7cr  button "shop-api-1"
+        text "91.7 MB"
+        text "RUN apk add curl"
+yawaam  button "nginx:alpine 888888888888 52.5 MB 4w unused"
+vjdzsw  checkbox "Mark" [unchecked]
+x6e8f4  button "<none> 777777777777 dangling 777777777777 1.1 GB 4mo unused"
+7j4xn7  checkbox "Mark" [unchecked]
+        text "↑↓"
+        text "move"
+        text "/"
+        text "find"
+        text "space"
+        text "mark"
+        text "⏎"
+        text "layers"
+        text "p"
+        text "pull"
+        text "u"
+        text "update"
+        text "d"
+        text "remove"
+vkezc4  button ": commands"
+j6g64y  button "?"
+fields:
+px62tc  field "Filter images"

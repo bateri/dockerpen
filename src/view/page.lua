@@ -1,4 +1,11 @@
 -- (page entry: assembled from the old page; to be rewritten)
+-- Asked of the kit before anything is used that an older one does not have: where it has not, a screen
+-- that says so, and nothing else.
+local needs = require("./needs")
+if not needs.met() then
+	return needs.screen()
+end
+
 local lib_kit = require("./lib/kit")
 local parts_ui = require("./parts/ui")
 local input_keys = require("./input/keys")
@@ -10,6 +17,7 @@ local model_feed = require("./model/feed")
 local model_lists = require("./model/lists")
 local model_log = require("./model/log")
 local model_nav = require("./model/nav")
+local model_palette = require("./model/palette")
 local model_net = require("./model/net")
 local model_rows = require("./model/rows")
 local model_state = require("./model/state")
@@ -83,6 +91,8 @@ local function main_screen(g)
 						:mr(-3)
 						:no_shrink()
 						:press("split")
+						:role("slider")
+						:label("Detail width")
 						:row()
 						:justify_center()
 						:child(b.div():w(1):h_full():bg(alpha("border", ui.pressed == "split" and 1 or 0.6)))
@@ -418,6 +428,16 @@ local function handle(event)
 		-- The person clicked into the field (or the keyboard left it of itself).
 		S.typing = event.field ~= nil
 		result = true
+	elseif kind == "command" then
+		-- Done on an element by a screen reader or an agent, as a key or a press would have done it.
+		local cid = event.target and string.match(event.target, "^row:(.*)$")
+		if event.id == "dismiss" and S.palette then
+			model_palette.palette.close()
+			result = true
+		elseif cid and S.by_id[cid] and (event.id == "toggle" or event.id == "restart" or event.id == "logs") then
+			mouse.click("ra:" .. event.id .. ":" .. cid)
+			result = true
+		end
 	elseif kind == "menu" then
 		-- The line the person picked, in the table the page wrote for it.
 		local line = event.entry

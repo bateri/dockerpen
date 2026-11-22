@@ -1,0 +1,16 @@
+focus: page
+note: behind the modal in front, 51 items of the page, not read
+items:
+fg3e22  dialog "Clean up"
+          text "Remove what nothing uses. Running containers, and what they use, are never touched."
+q4wkd7    button "Stopped containers Every container that is not running 4.1 KB"
+y5adrp    button "Dangling images Layers no tag points to any more"
+sevffm    button "Unused images Every image no container was made from 124 MB"
+kzxp9k    button "Unused volumes Data no container mounts — gone for good 189 MB"
+psmxf3    button "Unused networks Networks no container is on"
+983tvt    button "Build cache What builds kept to go faster next time 0 B"
+          text "About"
+          text "4.1 KB"
+          text "to free"
+fdyfb7    button "Cancel esc"
+enh19z    button "Clean up ⏎"

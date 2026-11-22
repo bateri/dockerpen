@@ -58,7 +58,7 @@ function toolbar.containers(width)
 		size = "sm",
 		icon = "arrow-down-wide-narrow",
 		icon_size = 13,
-	})
+	}):label("Sort by " .. (SORT_LABELS[S.sort] or "name"))
 	if narrow or width >= 690 then
 		return b.div()
 			:row()
